@@ -1,5 +1,7 @@
 # CureNet: Problem-Solution Architecture
 
+![CureNet Logo](Assets/CureNet_Logo.png)
+
 ## Patient-Centric Solutions
 
 Problem: Fragmented historical data leads to 32% of lab tests being repeated unnecessarily.
