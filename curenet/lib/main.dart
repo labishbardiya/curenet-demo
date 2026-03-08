@@ -8,6 +8,7 @@ import 'screens/login_mobile_screen.dart';
 import 'screens/login_otp_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/profile_screen.dart'
+import 'screens/notifications_screen.dart'
 
 void main() {
   runApp(const CureNetApp());
@@ -32,6 +33,7 @@ class CureNetApp extends StatelessWidget {
         '/login-otp': (context) => const LoginOtpScreen(),
         '/home': (context) => const HomeScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/notifications': (context) => const NotificationsScreen(),
       },
     );
   }
