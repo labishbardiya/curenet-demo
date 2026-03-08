@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import 'package:curenet/core/navigation_helper.dart';
 
 class AccessRequestScreen extends StatelessWidget {
   const AccessRequestScreen({super.key});

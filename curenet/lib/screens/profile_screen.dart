@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import 'package:curenet/core/navigation_helper.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -106,11 +107,7 @@ class ProfileScreen extends StatelessWidget {
                       _settingRow("Notification Preferences", () {}),
                       _settingRow("Download Health Records", () {}),
                       _settingRow("Privacy Policy & DPDP Act", () => Navigator.pushNamed(context, '/privacy-policy')),
-                      _settingRow(
-                        "Log Out",
-                        () => Navigator.pushNamedAndRemoveUntil(context, '/splash', (route) => false),
-                        isRed: true,
-                      ),
+                      _settingRow("🛠 Edge Cases (Debug)", () => Navigator.pushNamed(context, '/edge'), isRed: false),
                     ],
                   ),
 

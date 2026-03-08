@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import 'package:curenet/core/navigation_helper.dart';
 
 class AccessGrantedScreen extends StatelessWidget {
   const AccessGrantedScreen({super.key});

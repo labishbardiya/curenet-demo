@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import 'package:curenet/core/navigation_helper.dart';
 
 class RecordsScreen extends StatefulWidget {
   const RecordsScreen({super.key});

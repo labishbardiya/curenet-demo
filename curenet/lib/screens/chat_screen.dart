@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../core/voice_helper.dart';          // ← Added for speaker
+import 'package:curenet/core/navigation_helper.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -35,11 +37,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.clear();
     _scrollToBottom();
 
-    // Simulate typing + reply
     Future.delayed(const Duration(milliseconds: 600), () {
       final reply = _sampleResponses[text] ??
           "Based on your records, that's a great question! Let me check... For anything specific, I recommend discussing with your doctor. How else can I help? 🩺";
-
       setState(() {
         _messages.add({"role": "bot", "text": reply});
       });
@@ -72,92 +72,155 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      body: Column(
+  // NEW: Message bubble with speaker icon
+  Widget _buildMessageBubble(Map<String, dynamic> msg) {
+    final isUser = msg["role"] == "user";
+    final text = msg["text"] as String;
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.fromLTRB(18, 44, 18, 14),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xFFD8DDE6))),
+          if (!isUser)
+            IconButton(
+              icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 20),
+              onPressed: () => VoiceHelper.speak(text),
             ),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Text("←", style: TextStyle(fontSize: 26, color: Color(0xFF0D2240))),
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isUser ? const Color(0xFF00A3A3) : Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(18),
+                topRight: const Radius.circular(18),
+                bottomLeft: Radius.circular(isUser ? 18 : 4),
+                bottomRight: Radius.circular(isUser ? 4 : 18),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-                const SizedBox(width: 12),
-                const CircleAvatar(
-                  radius: 17,
-                  backgroundColor: Color(0xFFE07B39),
-                  child: Text("🤖", style: TextStyle(fontSize: 18)),
-                ),
-                const SizedBox(width: 10),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Abhya AI", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                    Text("Always here • 24×7", style: TextStyle(fontSize: 10, color: Color(0xFF22A36A))),
-                  ],
-                ),
-                const Spacer(),
-                const Icon(Icons.more_horiz, color: Color(0xFF9BA8BB)),
               ],
             ),
-          ),
-
-          // Messages
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                final isUser = msg["role"] == "user";
-
-                return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isUser ? const Color(0xFF00A3A3) : Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(18),
-                        topRight: const Radius.circular(18),
-                        bottomLeft: Radius.circular(isUser ? 18 : 4),
-                        bottomRight: Radius.circular(isUser ? 4 : 18),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      msg["text"],
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                        color: isUser ? Colors.white : const Color(0xFF0D2240),
-                      ),
-                    ),
-                  ),
-                );
-              },
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                color: isUser ? Colors.white : const Color(0xFF0D2240),
+              ),
             ),
           ),
+          if (isUser)
+            IconButton(
+              icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 20),
+              onPressed: () => VoiceHelper.speak(text),
+            ),
+        ],
+      ),
+    );
+  }
 
-          // Starter Questions
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: const Color(0xFFF5F7FA),
+    body: Column(
+      children: [
+        // Header (unchanged)
+        Container(
+          padding: const EdgeInsets.fromLTRB(18, 44, 18, 14),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: Color(0xFFD8DDE6))),
+          ),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: const Text("←", style: TextStyle(fontSize: 26, color: Color(0xFF0D2240))),
+              ),
+              const SizedBox(width: 12),
+              const CircleAvatar(
+                radius: 17,
+                backgroundColor: Color(0xFFE07B39),
+                child: Text("🤖", style: TextStyle(fontSize: 18)),
+              ),
+              const SizedBox(width: 10),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Abhya AI", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  Text("Always here • 24×7", style: TextStyle(fontSize: 10, color: Color(0xFF22A36A))),
+                ],
+              ),
+              const Spacer(),
+              const Icon(Icons.more_horiz, color: Color(0xFF9BA8BB)),
+            ],
+          ),
+        ),
+
+
+        // Messages with speaker icons
+        Expanded(
+          child: ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.all(16),
+            itemCount: _messages.length,
+            itemBuilder: (context, index) {
+              final msg = _messages[index];
+              final isUser = msg["role"] == "user";
+              return Align(
+                alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isUser)
+                      IconButton(
+                        icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 22),
+                        onPressed: () => VoiceHelper.speak(msg["text"]),
+                      ),
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isUser ? const Color(0xFF00A3A3) : Colors.white,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(18),
+                          topRight: const Radius.circular(18),
+                          bottomLeft: Radius.circular(isUser ? 18 : 4),
+                          bottomRight: Radius.circular(isUser ? 4 : 18),
+                        ),
+                      ),
+                      child: Text(
+                        msg["text"],
+                        style: TextStyle(
+                          fontSize: 15,
+                          height: 1.5,
+                          color: isUser ? Colors.white : const Color(0xFF0D2240),
+                        ),
+                      ),
+                    ),
+                    if (isUser)
+                      IconButton(
+                        icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 22),
+                        onPressed: () => VoiceHelper.speak(msg["text"]),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+
+          // Starter Questions (unchanged)
           Container(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             decoration: const BoxDecoration(
@@ -175,7 +238,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
 
-          // Input Bar
+          // Input Bar (unchanged)
           Container(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
             decoration: const BoxDecoration(

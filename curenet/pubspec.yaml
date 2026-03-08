@@ -30,10 +30,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  qr_flutter: ^4.1.0          # Real QR code generation
+  flutter_tts: ^4.0.2         # Voice readout (TTS)
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  http: ^1.6.0
+  image_picker: ^1.2.1
+  screenshot: ^3.0.0
+  image_gallery_saver: ^2.0.3
+  permission_handler: ^12.0.1
+  google_fonts: ^8.0.2
 
 dev_dependencies:
   flutter_test:

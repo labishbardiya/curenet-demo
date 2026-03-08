@@ -17,6 +17,7 @@ import 'screens/qr_share_screen.dart';
 import 'screens/access_request_screen.dart';
 import 'screens/access_granted_screen.dart';
 import 'screens/doc_scan_screen.dart';
+import 'core/voice_helper.dart';
 
 
 void main() {
@@ -28,6 +29,7 @@ class CureNetApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    VoiceHelper.init();
     return MaterialApp(
       title: 'CureNet',
       debugShowCheckedModeBanner: false,

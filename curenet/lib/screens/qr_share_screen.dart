@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../core/theme.dart';
 
 class QrShareScreen extends StatelessWidget {
@@ -6,11 +7,13 @@ class QrShareScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const String abhaNumber = "91-2345-6789-0123"; // Dynamic in real app
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: Column(
         children: [
-          // Header
+          // Header (same as before)
           Container(
             padding: const EdgeInsets.fromLTRB(20, 44, 20, 16),
             decoration: const BoxDecoration(
@@ -39,7 +42,7 @@ class QrShareScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 20),
 
-                  // QR Code Card (exact v5 style)
+                  // REAL QR CODE
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -51,37 +54,15 @@ class QrShareScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        // QR Code (using Flutter's built-in QR - looks identical)
-                        Container(
-                          width: 240,
-                          height: 240,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFD8DDE6), width: 8),
-                          ),
-                          child: Center(
-                            child: Image.asset(
-                              'assets/qr.png', // We'll create a placeholder image later
-                              width: 200,
-                              height: 200,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                width: 200,
-                                height: 200,
-                                color: const Color(0xFF0D2240),
-                                child: const Center(
-                                  child: Text(
-                                    "QR",
-                                    style: TextStyle(fontSize: 80, color: Colors.white, fontWeight: FontWeight.w900),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                        QrImageView(
+                          data: abhaNumber,
+                          version: QrVersions.auto,
+                          size: 220,
+                          gapless: false,
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF0D2240),
                         ),
-
                         const SizedBox(height: 20),
-
                         const Text(
                           "91-2345-6789-0123",
                           style: TextStyle(
@@ -101,7 +82,7 @@ class QrShareScreen extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // Instructions card
+                  // Instructions (same as v5)
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -128,20 +109,8 @@ class QrShareScreen extends StatelessWidget {
 
                   const SizedBox(height: 32),
 
-                  // Big Share Button
                   ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("QR Ready! Show to doctor →"),
-                          backgroundColor: Color(0xFF00A3A3),
-                        ),
-                      );
-                      // In real flow this would open access request after scan
-                      Future.delayed(const Duration(seconds: 1), () {
-                        Navigator.pushNamed(context, '/access-req');
-                      });
-                    },
+                    onPressed: () => Navigator.pushNamed(context, '/access-req'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0D2240),
                       minimumSize: const Size(double.infinity, 58),
@@ -152,74 +121,6 @@ class QrShareScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
                     ),
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // Offline note
-                  const Text(
-                    "Works completely offline • No internet needed",
-                    style: TextStyle(fontSize: 12, color: Color(0xFF9BA8BB)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-
-      // Bottom Navigation (active on Share)
-      bottomNavigationBar: Container(
-        height: 78,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFD8DDE6))),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _navItem("🏠", "Home", false, () => Navigator.pushReplacementNamed(context, '/home')),
-            _navItem("🤖", "ABHAy", false, () => Navigator.pushReplacementNamed(context, '/chat')),
-            _scanButton(context),
-            _navItem("📋", "Records", false, () => Navigator.pushReplacementNamed(context, '/records')),
-            _navItem("📲", "Share", true, null),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _navItem(String icon, String label, bool active, VoidCallback? onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(icon, style: TextStyle(fontSize: 22, color: active ? const Color(0xFF00A3A3) : const Color(0xFF9BA8BB))),
-          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: active ? const Color(0xFF00A3A3) : const Color(0xFF9BA8BB))),
-        ],
-      ),
-    );
-  }
-
-  Widget _scanButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/doc-scan'),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF00A3A3), Color(0xFF00C4C4)]),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text("📷", style: TextStyle(fontSize: 20, color: Colors.white)),
-                  Text("SCAN", style: TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1)),
                 ],
               ),
             ),
