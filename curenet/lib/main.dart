@@ -5,6 +5,8 @@ import 'screens/splash_screen.dart';
 import 'screens/language_select_screen.dart';
 import 'screens/login_options_screen.dart';
 import 'screens/login_mobile_screen.dart';
+import 'screens/login_otp_screen.dart';
+import 'screens/home_screen.dart';
 
 
 void main() {
@@ -27,6 +29,8 @@ class CureNetApp extends StatelessWidget {
         '/language-select': (context) => const LanguageSelectScreen(),
         '/login-options': (context) => const LoginOptionsScreen(),
         '/login-mobile': (context) => const LoginMobileScreen(),
+        '/login-otp': (context) => const LoginOtpScreen(),
+        '/home': (context) => const HomeScreen(),
       },
     );
   }
