@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../core/theme.dart';
+import '../core/translated_text.dart';
 import 'package:curenet/core/navigation_helper.dart';
 
 class LoginOtpScreen extends StatefulWidget {
@@ -91,7 +92,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                   child: const Text("←", style: TextStyle(fontSize: 26, color: Color(0xFF0D2240))),
                 ),
                 const SizedBox(width: 14),
-                const Text(
+                const TranslatedText(
                   "Enter OTP",
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0D2240)),
                 ),
@@ -120,7 +121,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                   ),
 
                   const SizedBox(height: 24),
-                  const Text(
+                  const TranslatedText(
                     "6-digit OTP sent to",
                     style: TextStyle(fontSize: 13, color: Color(0xFF5A6880)),
                   ),
@@ -172,7 +173,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Resend in: ", style: TextStyle(fontSize: 12, color: Color(0xFF9BA8BB))),
+                      const TranslatedText("Resend in: ", style: TextStyle(fontSize: 12, color: Color(0xFF9BA8BB))),
                       Text(
                         "${_timerSeconds}s",
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF22A36A)),
@@ -186,7 +187,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                               const SnackBar(content: Text("OTP resent ✓"), backgroundColor: Color(0xFF00A3A3)),
                             );
                           },
-                          child: const Text(
+                          child: const TranslatedText(
                             "Resend OTP",
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF00A3A3)),
                           ),
@@ -198,7 +199,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
 
                   // Error message
                   if (_showError)
-                    const Text(
+                    const TranslatedText(
                       "❌ Incorrect OTP. Please try again.",
                       style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600),
                     ),
@@ -213,14 +214,14 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                       minimumSize: const Size(double.infinity, 54),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    child: const Text(
+                    child: const TranslatedText(
                       "Verify OTP →",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                     ),
                   ),
 
                   const SizedBox(height: 20),
-                  const Text(
+                  const TranslatedText(
                     "Demo OTP: 123456",
                     style: TextStyle(fontSize: 11, color: Color(0xFF9BA8BB)),
                   ),

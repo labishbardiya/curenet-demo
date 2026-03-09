@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
-import 'package:curenet/core/navigation_helper.dart';
+import 'dart:async';
+import '../core/app_language.dart';
+import '../core/translated_text.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -11,6 +12,29 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   int currentSlide = 0;
+  Timer? _carouselTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoSlide();
+  }
+
+  void _startAutoSlide() {
+    _carouselTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) {
+        setState(() {
+          currentSlide = (currentSlide + 1) % slides.length;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _carouselTimer?.cancel();
+    super.dispose();
+  }
 
   final List<Map<String, dynamic>> slides = [
     {
@@ -91,14 +115,31 @@ class _SplashScreenState extends State<SplashScreen> {
                         border: Border.all(color: const Color(0xFFD8DDE6), width: 2),
                         borderRadius: BorderRadius.circular(22),
                       ),
-                      child: const Row(
-                        children: [
-                          Text("🇮🇳", style: TextStyle(fontSize: 15)),
-                          SizedBox(width: 6),
-                          Text("English", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                          SizedBox(width: 4),
-                          Text("▼", style: TextStyle(fontSize: 11, color: Color(0xFF9BA8BB))),
-                        ],
+                      child: ValueListenableBuilder<String>(
+                        valueListenable: AppLanguage.selectedLanguage,
+                        builder: (context, language, _) {
+                          return Row(
+                            children: [
+                              const Text("🇮🇳", style: TextStyle(fontSize: 15)),
+                              const SizedBox(width: 6),
+                              Text(
+                                language,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                "▼",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF9BA8BB),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -141,7 +182,7 @@ class _SplashScreenState extends State<SplashScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Column(
                 children: [
-                  Text(
+                  TranslatedText(
                     slide["title"],
                     textAlign: TextAlign.center,
                     style: const TextStyle(
@@ -152,7 +193,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text(
+                  TranslatedText(
                     slide["desc"],
                     textAlign: TextAlign.center,
                     style: const TextStyle(
@@ -186,25 +227,22 @@ class _SplashScreenState extends State<SplashScreen> {
 
             const SizedBox(height: 30),
 
-            // Next / Get Started button
+            // Get Started button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: ElevatedButton(
                 onPressed: () {
-                  if (currentSlide < slides.length - 1) {
-                    setState(() => currentSlide++);
-                  } else {
-                    Navigator.pushNamed(context, '/language-select');
-                  }
+                  _carouselTimer?.cancel();
+                  Navigator.pushNamed(context, '/login-options');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0D2240),
                   minimumSize: const Size(double.infinity, 54),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                child: Text(
-                  currentSlide == slides.length - 1 ? "Get Started" : "Next →",
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                child: const TranslatedText(
+                  "Get Started",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
               ),
             ),

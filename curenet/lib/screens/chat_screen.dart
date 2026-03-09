@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
-import '../core/voice_helper.dart';          // ← Added for speaker
+import '../core/voice_helper.dart';
+import '../core/translated_text.dart';
 import 'package:curenet/core/navigation_helper.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -86,7 +87,17 @@ class _ChatScreenState extends State<ChatScreen> {
           if (!isUser)
             IconButton(
               icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 20),
-              onPressed: () => VoiceHelper.speak(text),
+              onPressed: () async {
+                final ok = await VoiceHelper.speak(text);
+                if (!ok && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(VoiceHelper.lastError ?? 'Voice readout failed.'),
+                      backgroundColor: const Color(0xFF0D2240),
+                    ),
+                  );
+                }
+              },
             ),
           Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -120,7 +131,17 @@ class _ChatScreenState extends State<ChatScreen> {
           if (isUser)
             IconButton(
               icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 20),
-              onPressed: () => VoiceHelper.speak(text),
+              onPressed: () async {
+                final ok = await VoiceHelper.speak(text);
+                if (!ok && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(VoiceHelper.lastError ?? 'Voice readout failed.'),
+                      backgroundColor: const Color(0xFF0D2240),
+                    ),
+                  );
+                }
+              },
             ),
         ],
       ),
@@ -156,8 +177,8 @@ Widget build(BuildContext context) {
               const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Abhya AI", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  Text("Always here • 24×7", style: TextStyle(fontSize: 10, color: Color(0xFF22A36A))),
+                  TranslatedText("Abhya AI", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  TranslatedText("Always here • 24×7", style: TextStyle(fontSize: 10, color: Color(0xFF22A36A))),
                 ],
               ),
               const Spacer(),
@@ -184,7 +205,17 @@ Widget build(BuildContext context) {
                     if (!isUser)
                       IconButton(
                         icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 22),
-                        onPressed: () => VoiceHelper.speak(msg["text"]),
+                        onPressed: () async {
+                          final ok = await VoiceHelper.speak(msg["text"]);
+                          if (!ok && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(VoiceHelper.lastError ?? 'Voice readout failed.'),
+                                backgroundColor: const Color(0xFF0D2240),
+                              ),
+                            );
+                          }
+                        },
                       ),
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -211,7 +242,17 @@ Widget build(BuildContext context) {
                     if (isUser)
                       IconButton(
                         icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 22),
-                        onPressed: () => VoiceHelper.speak(msg["text"]),
+                        onPressed: () async {
+                          final ok = await VoiceHelper.speak(msg["text"]);
+                          if (!ok && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(VoiceHelper.lastError ?? 'Voice readout failed.'),
+                                backgroundColor: const Color(0xFF0D2240),
+                              ),
+                            );
+                          }
+                        },
                       ),
                   ],
                 ),

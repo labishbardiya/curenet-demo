@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
-import 'package:curenet/core/navigation_helper.dart';
+import '../core/app_language.dart';
+import '../core/translated_text.dart';
 
 class LoginOptionsScreen extends StatelessWidget {
   const LoginOptionsScreen({super.key});
@@ -29,19 +29,24 @@ class LoginOptionsScreen extends StatelessWidget {
                     right: 18,
                     child: GestureDetector(
                       onTap: () => Navigator.pushNamed(context, '/language-select'),
-                      child: Row(
-                        children: const [
-                          Text("🌐", style: TextStyle(fontSize: 18)),
-                          SizedBox(width: 6),
-                          Text(
-                            "English",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0D2240),
-                            ),
-                          ),
-                        ],
+                      child: ValueListenableBuilder<String>(
+                        valueListenable: AppLanguage.selectedLanguage,
+                        builder: (context, language, _) {
+                          return Row(
+                            children: [
+                              const Text("🌐", style: TextStyle(fontSize: 18)),
+                              const SizedBox(width: 6),
+                              Text(
+                                language,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0D2240),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -56,7 +61,7 @@ class LoginOptionsScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withValues(alpha: 0.3),
                             blurRadius: 40,
                             offset: const Offset(0, 16),
                           ),
@@ -123,7 +128,7 @@ class LoginOptionsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                const TranslatedText(
                   "Login",
                   style: TextStyle(
                     fontSize: 22,
@@ -132,7 +137,7 @@ class LoginOptionsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                const TranslatedText(
                   "Choose how you want to login",
                   style: TextStyle(fontSize: 13, color: Color(0xFF5A6880)),
                 ),
@@ -200,7 +205,7 @@ class LoginOptionsScreen extends StatelessWidget {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(13),
                           ),
                           child: const Center(
@@ -212,7 +217,7 @@ class LoginOptionsScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
+                              TranslatedText(
                                 "No ABHA? Create FREE",
                                 style: TextStyle(
                                   fontSize: 15,
@@ -220,7 +225,7 @@ class LoginOptionsScreen extends StatelessWidget {
                                   color: Colors.white,
                                 ),
                               ),
-                              Text(
+                              TranslatedText(
                                 "Get your free digital health ID today",
                                 style: TextStyle(
                                   fontSize: 12,
@@ -269,7 +274,7 @@ class LoginOptionsScreen extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
+                color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Center(
@@ -278,7 +283,7 @@ class LoginOptionsScreen extends StatelessWidget {
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(
+              child: TranslatedText(
                 title,
                 style: const TextStyle(
                   fontSize: 15,
@@ -314,7 +319,7 @@ class LoginOptionsScreen extends StatelessWidget {
           children: [
             Text(icon, style: const TextStyle(fontSize: 22)),
             const SizedBox(height: 6),
-            Text(
+            TranslatedText(
               label,
               style: const TextStyle(
                 fontSize: 11,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../core/voice_helper.dart';
 import 'package:curenet/core/navigation_helper.dart';
 
 class RecordsScreen extends StatefulWidget {
@@ -99,6 +100,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
               itemCount: filteredRecords.length,
               itemBuilder: (context, index) {
                 final record = filteredRecords[index];
+                final speakText = '${record['title']}. By ${record['doctor']}. ${record['date']}.';
                 return GestureDetector(
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -118,6 +120,22 @@ class _RecordsScreenState extends State<RecordsScreen> {
                     ),
                     child: Row(
                       children: [
+                        IconButton(
+                          icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 22),
+                          onPressed: () async {
+                            final ok = await VoiceHelper.speak(speakText);
+                            if (!ok && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(VoiceHelper.lastError ?? 'Voice readout failed.'),
+                                  backgroundColor: const Color(0xFF0D2240),
+                                ),
+                              );
+                            }
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        ),
                         Container(
                           width: 52,
                           height: 52,

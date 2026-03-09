@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
-import 'package:curenet/core/navigation_helper.dart';
+import '../core/app_language.dart';
 
 class LanguageSelectScreen extends StatefulWidget {
   const LanguageSelectScreen({super.key});
@@ -10,35 +9,35 @@ class LanguageSelectScreen extends StatefulWidget {
 }
 
 class _LanguageSelectScreenState extends State<LanguageSelectScreen> {
-  String selectedLanguage = 'English'; // Default as per v5
+  String selectedLanguage = AppLanguage.selectedLanguage.value;
 
   final List<Map<String, String>> languages = [
-    {'name': 'English', 'native': ''},
-    {'name': 'हिन्दी', 'native': 'Hindi'},
-    {'name': 'বাংলা', 'native': 'Bengali'},
-    {'name': 'తెలుగు', 'native': 'Telugu'},
-    {'name': 'मराठी', 'native': 'Marathi'},
-    {'name': 'தமிழ்', 'native': 'Tamil'},
-    {'name': 'اردو', 'native': 'Urdu'},
-    {'name': 'ગુજરાતી', 'native': 'Gujarati'},
-    {'name': 'ಕನ್ನಡ', 'native': 'Kannada'},
-    {'name': 'ଓଡ଼ିଆ', 'native': 'Odia'},
-    {'name': 'മലയാളം', 'native': 'Malayalam'},
-    {'name': 'ਪੰਜਾਬੀ', 'native': 'Punjabi'},
-    {'name': 'অসমীয়া', 'native': 'Assamese'},
-    {'name': 'मैथिली', 'native': 'Maithili'},
-    {'name': 'संस्कृत', 'native': 'Sanskrit'},
-    {'name': 'नेपाली', 'native': 'Nepali'},
-    {'name': 'सिंधी', 'native': 'Sindhi'},
-    {'name': 'कोंकणी', 'native': 'Konkani'},
-    {'name': 'डोगरी', 'native': 'Dogri'},
-    {'name': 'बड़ो', 'native': 'Bodo'},
-    {'name': 'মৈতৈলোন্', 'native': 'Manipuri'},
-    {'name': 'کٲشُر', 'native': 'Kashmiri'},
+    {'label': 'English', 'value': 'English', 'native': ''},
+    {'label': 'हिन्दी', 'value': 'Hindi', 'native': 'Hindi'},
+    {'label': 'বাংলা', 'value': 'Bengali', 'native': 'Bengali'},
+    {'label': 'తెలుగు', 'value': 'Telugu', 'native': 'Telugu'},
+    {'label': 'मराठी', 'value': 'Marathi', 'native': 'Marathi'},
+    {'label': 'தமிழ்', 'value': 'Tamil', 'native': 'Tamil'},
+    {'label': 'اردو', 'value': 'Urdu', 'native': 'Urdu'},
+    {'label': 'ગુજરાતી', 'value': 'Gujarati', 'native': 'Gujarati'},
+    {'label': 'ಕನ್ನಡ', 'value': 'Kannada', 'native': 'Kannada'},
+    {'label': 'ଓଡ଼ିଆ', 'value': 'Odia', 'native': 'Odia'},
+    {'label': 'മലയാളം', 'value': 'Malayalam', 'native': 'Malayalam'},
+    {'label': 'ਪੰਜਾਬੀ', 'value': 'Punjabi', 'native': 'Punjabi'},
+    {'label': 'অসমীয়া', 'value': 'Assamese', 'native': 'Assamese'},
+    {'label': 'मैथिली', 'value': 'Maithili', 'native': 'Maithili'},
+    {'label': 'संस्कृत', 'value': 'Sanskrit', 'native': 'Sanskrit'},
+    {'label': 'नेपाली', 'value': 'Nepali', 'native': 'Nepali'},
+    {'label': 'सिंधी', 'value': 'Sindhi', 'native': 'Sindhi'},
+    {'label': 'कोंकणी', 'value': 'Konkani', 'native': 'Konkani'},
+    {'label': 'डोगरी', 'value': 'Dogri', 'native': 'Dogri'},
+    {'label': 'बड़ो', 'value': 'Bodo', 'native': 'Bodo'},
+    {'label': 'মৈতৈলোন্', 'value': 'Manipuri', 'native': 'Manipuri'},
+    {'label': 'کٲشُر', 'value': 'Kashmiri', 'native': 'Kashmiri'},
   ];
 
   void pickLanguage(String lang) {
-    setState(() => selectedLanguage = lang);
+    setState(() => selectedLanguage = AppLanguage.normalizeLanguage(lang));
   }
 
   @override
@@ -83,10 +82,10 @@ class _LanguageSelectScreenState extends State<LanguageSelectScreen> {
               itemCount: languages.length,
               itemBuilder: (context, index) {
                 final lang = languages[index];
-                final isSelected = lang['name'] == selectedLanguage;
+                final isSelected = lang['value'] == selectedLanguage;
 
                 return GestureDetector(
-                  onTap: () => pickLanguage(lang['name']!),
+                  onTap: () => pickLanguage(lang['value']!),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                     decoration: BoxDecoration(
@@ -126,7 +125,7 @@ class _LanguageSelectScreenState extends State<LanguageSelectScreen> {
                         ),
                         const SizedBox(width: 14),
                         Text(
-                          lang['name']!,
+                          lang['label']!,
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -155,9 +154,10 @@ class _LanguageSelectScreenState extends State<LanguageSelectScreen> {
           Padding(
             padding: const EdgeInsets.all(18),
             child: ElevatedButton(
-              onPressed: () {
-                // In v5 it goes back to splash, but for real flow we go to Login Options
-                Navigator.pushNamed(context, '/login-options');
+              onPressed: () async {
+                await AppLanguage.setLanguage(selectedLanguage);
+                if (!context.mounted) return;
+                Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00A3A3),

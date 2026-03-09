@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
-import 'package:curenet/core/navigation_helper.dart';
+import '../core/translated_text.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -67,7 +66,7 @@ class HomeScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: const [
-                Text(
+                TranslatedText(
                   "Good morning, Priya 👋",
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0D2240)),
                 ),
@@ -77,7 +76,7 @@ class HomeScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // ABHAy AI Big Card (clickable)
+          // ABHAy AI Big Card
           GestureDetector(
             onTap: () => Navigator.pushNamed(context, '/chat'),
             child: Container(
@@ -109,15 +108,15 @@ class HomeScreen extends StatelessWidget {
                         child: const Center(child: Text("🤖", style: TextStyle(fontSize: 28))),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const TranslatedText(
                               "Ask Abhya AI",
                               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white),
                             ),
-                            Text(
+                            const TranslatedText(
                               "Anything about your health",
                               style: TextStyle(fontSize: 13, color: Colors.white70),
                             ),
@@ -134,7 +133,7 @@ class HomeScreen extends StatelessWidget {
                       color: Colors.white.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
+                    child: const TranslatedText(
                       "What medications am I on right now?",
                       style: TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
                     ),
@@ -168,15 +167,15 @@ class HomeScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
-                Text("Recent Records", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0D2240))),
-                Text("View all →", style: TextStyle(fontSize: 13, color: Color(0xFF00A3A3), fontWeight: FontWeight.w600)),
+                TranslatedText("Recent Records", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0D2240))),
+                TranslatedText("View all →", style: TextStyle(fontSize: 13, color: Color(0xFF00A3A3), fontWeight: FontWeight.w600)),
               ],
             ),
           ),
 
           const SizedBox(height: 12),
 
-          // Sample Records (horizontal scroll)
+          // Sample Records
           SizedBox(
             height: 110,
             child: ListView(
@@ -193,6 +192,28 @@ class HomeScreen extends StatelessWidget {
           ),
 
           const Spacer(),
+
+          // Change Language Button (your addition, now properly placed)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: ElevatedButton(
+              onPressed: () => Navigator.pushNamed(context, '/language-select'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00A3A3),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const TranslatedText(
+                'Change Language',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
 
           // Bottom Navigation
           Container(
@@ -217,6 +238,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  // Your existing helper methods (unchanged)
   Widget _quickAction(BuildContext context, String emoji, String label, String route) {
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, route),
@@ -233,7 +255,7 @@ class HomeScreen extends StatelessWidget {
             child: Center(child: Text(emoji, style: const TextStyle(fontSize: 24))),
           ),
           const SizedBox(height: 6),
-          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF5A6880))),
+          TranslatedText(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF5A6880))),
         ],
       ),
     );
@@ -275,7 +297,7 @@ class HomeScreen extends StatelessWidget {
             ),
             child: Center(child: Text(icon, style: const TextStyle(fontSize: 22))),
           ),
-          Text(
+          TranslatedText(
             label,
             style: TextStyle(
               fontSize: 10,

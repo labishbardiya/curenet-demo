@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../core/voice_helper.dart';
+import '../core/translated_text.dart';
 import 'package:curenet/core/navigation_helper.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -26,7 +28,7 @@ class ProfileScreen extends StatelessWidget {
                   child: const Text("←", style: TextStyle(fontSize: 26, color: Colors.white)),
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                const TranslatedText(
                   "My Profile",
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
                 ),
@@ -55,7 +57,7 @@ class ProfileScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [
-                      Text(
+                      TranslatedText(
                         "Priya Sharma",
                         style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFF0D2240)),
                       ),
@@ -65,6 +67,22 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 24),
+                  onPressed: () async {
+                    final ok = await VoiceHelper.speak(
+                      "Priya Sharma. ABHA number 91-2345-6789-0123.",
+                    );
+                    if (!ok && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(VoiceHelper.lastError ?? 'Voice readout failed.'),
+                          backgroundColor: const Color(0xFF0D2240),
+                        ),
+                      );
+                    }
+                  },
                 ),
               ],
             ),

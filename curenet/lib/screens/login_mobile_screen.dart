@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../core/translated_text.dart';
 import 'package:curenet/core/navigation_helper.dart';
 
 class LoginMobileScreen extends StatefulWidget {
@@ -35,11 +36,11 @@ class _LoginMobileScreenState extends State<LoginMobileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      TranslatedText(
                         "Mobile Login",
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0D2240)),
                       ),
-                      Text(
+                      TranslatedText(
                         "Step 1 of 2",
                         style: TextStyle(fontSize: 11, color: Color(0xFF9BA8BB)),
                       ),
@@ -105,13 +106,13 @@ class _LoginMobileScreenState extends State<LoginMobileScreen> {
                           style: TextStyle(fontSize: 52),
                         ),
                         const SizedBox(height: 10),
-                        const Text(
+                        const TranslatedText(
                           "Enter your mobile number",
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0D2240)),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 4),
-                        const Text(
+                        const TranslatedText(
                           "We'll send a 6-digit OTP to verify",
                           style: TextStyle(fontSize: 13, color: Color(0xFF5A6880)),
                           textAlign: TextAlign.center,
@@ -123,7 +124,7 @@ class _LoginMobileScreenState extends State<LoginMobileScreen> {
                   const SizedBox(height: 32),
 
                   // Mobile input with +91
-                  const Text(
+                  const TranslatedText(
                     "Mobile Number",
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0D2240)),
                   ),
@@ -169,7 +170,7 @@ class _LoginMobileScreenState extends State<LoginMobileScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
+                  const TranslatedText(
                     "📩 A 6-digit OTP will be sent to this number",
                     style: TextStyle(fontSize: 11, color: Color(0xFF9BA8BB)),
                   ),
@@ -184,9 +185,9 @@ class _LoginMobileScreenState extends State<LoginMobileScreen> {
                       minimumSize: const Size(double.infinity, 54),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    child: const Text(
+                    child: const TranslatedText(
                       "Get OTP on Mobile 📩",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                     ),
                   ),
 

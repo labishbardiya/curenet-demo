@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../core/theme.dart';
+import '../core/voice_helper.dart';
 
 class QrShareScreen extends StatelessWidget {
   const QrShareScreen({super.key});
@@ -27,9 +28,27 @@ class QrShareScreen extends StatelessWidget {
                   child: const Text("←", style: TextStyle(fontSize: 26, color: Color(0xFF0D2240))),
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  "Share with Doctor",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0D2240)),
+                const Expanded(
+                  child: Text(
+                    "Share with Doctor",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0D2240)),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 24),
+                  onPressed: () async {
+                    final ok = await VoiceHelper.speak(
+                      "Share with Doctor. Your ABHA number is 91-2345-6789-0123. Show this QR to the doctor.",
+                    );
+                    if (!ok && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(VoiceHelper.lastError ?? 'Voice readout failed.'),
+                          backgroundColor: const Color(0xFF0D2240),
+                        ),
+                      );
+                    }
+                  },
                 ),
               ],
             ),

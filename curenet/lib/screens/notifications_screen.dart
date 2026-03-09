@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../core/voice_helper.dart';
 import 'package:curenet/core/navigation_helper.dart';
 
 class NotificationsScreen extends StatelessWidget {
@@ -37,6 +38,7 @@ class NotificationsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               children: [
                 _notificationCard(
+                  context: context,
                   icon: "📋",
                   iconColor: const Color(0xFF00A3A3),
                   title: "New Health Record Added",
@@ -46,6 +48,7 @@ class NotificationsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _notificationCard(
+                  context: context,
                   icon: "🔔",
                   iconColor: const Color(0xFFD63B3B),
                   title: "Doctor Access Request",
@@ -55,6 +58,7 @@ class NotificationsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _notificationCard(
+                  context: context,
                   icon: "✅",
                   iconColor: const Color(0xFF22A36A),
                   title: "Follow-up Reminder",
@@ -64,6 +68,7 @@ class NotificationsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _notificationCard(
+                  context: context,
                   icon: "💊",
                   iconColor: const Color(0xFF6B4E9B),
                   title: "Medication Reminder",
@@ -99,6 +104,7 @@ class NotificationsScreen extends StatelessWidget {
   }
 
   Widget _notificationCard({
+    required BuildContext context,
     required String icon,
     required Color iconColor,
     required String title,
@@ -106,6 +112,7 @@ class NotificationsScreen extends StatelessWidget {
     required String time,
     required bool isUnread,
   }) {
+    final speakText = '$title. $subtitle. $time.';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -146,6 +153,22 @@ class NotificationsScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 22),
+            onPressed: () async {
+              final ok = await VoiceHelper.speak(speakText);
+              if (!ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(VoiceHelper.lastError ?? 'Voice readout failed.'),
+                    backgroundColor: const Color(0xFF0D2240),
+                  ),
+                );
+              }
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           ),
           if (isUnread)
             Container(

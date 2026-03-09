@@ -1,6 +1,6 @@
-import 'package:curenet/screens/login_options_screen.dart';
 import 'package:flutter/material.dart';
 import 'core/theme.dart';
+import 'core/app_language.dart';
 import 'screens/splash_screen.dart';
 import 'screens/language_select_screen.dart';
 import 'screens/login_options_screen.dart';
@@ -20,7 +20,10 @@ import 'screens/doc_scan_screen.dart';
 import 'core/voice_helper.dart';
 
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppLanguage.load();
+  await VoiceHelper.init();
   runApp(const CureNetApp());
 }
 
@@ -29,7 +32,6 @@ class CureNetApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    VoiceHelper.init();
     return MaterialApp(
       title: 'CureNet',
       debugShowCheckedModeBanner: false,
