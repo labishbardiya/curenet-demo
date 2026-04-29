@@ -125,7 +125,6 @@ class ProfileScreen extends StatelessWidget {
                       _settingRow("Notification Preferences", () {}),
                       _settingRow("Download Health Records", () {}),
                       _settingRow("Privacy Policy & DPDP Act", () => Navigator.pushNamed(context, '/privacy-policy')),
-                      _settingRow("Edge Cases (Debug)", () => Navigator.pushNamed(context, '/edge'), isRed: false),
                     ],
                   ),
 

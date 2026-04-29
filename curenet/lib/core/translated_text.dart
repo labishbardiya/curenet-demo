@@ -41,12 +41,20 @@ class TranslatedText extends StatelessWidget {
           ),
           initialData: sourceText,
           builder: (context, snapshot) {
-            return Text(
-              snapshot.data ?? sourceText,
-              style: style,
-              textAlign: textAlign,
-              maxLines: maxLines,
-              overflow: overflow,
+            final translated = snapshot.data ?? sourceText;
+            return AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (Widget child, Animation<double> animation) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              child: Text(
+                translated,
+                key: ValueKey<String>(translated),
+                style: style,
+                textAlign: textAlign,
+                maxLines: maxLines,
+                overflow: overflow,
+              ),
             );
           },
         );

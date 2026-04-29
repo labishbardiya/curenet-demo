@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../core/theme.dart';
 import '../core/translated_text.dart';
+import 'package:flutter/services.dart';
 
 class MobileOtpVerifyScreen extends StatefulWidget {
   const MobileOtpVerifyScreen({super.key});
@@ -12,6 +13,7 @@ class MobileOtpVerifyScreen extends StatefulWidget {
 
 class _MobileOtpVerifyScreenState extends State<MobileOtpVerifyScreen> {
   final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
+  late final List<FocusNode> _focusNodes;
   int _timerSeconds = 60;
   bool _resendEnabled = false;
   Timer? _timer;
@@ -19,7 +21,20 @@ class _MobileOtpVerifyScreenState extends State<MobileOtpVerifyScreen> {
   @override
   void initState() {
     super.initState();
+    _focusNodes = List.generate(6, (index) => FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (_otpControllers[index].text.isEmpty && index > 0) {
+            _focusNodes[index - 1].requestFocus();
+            _otpControllers[index - 1].clear();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    ));
     _startTimer();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusNodes[0].requestFocus());
   }
 
   void _startTimer() {
@@ -91,6 +106,7 @@ class _MobileOtpVerifyScreenState extends State<MobileOtpVerifyScreen> {
                         width: 48,
                         child: TextField(
                           controller: _otpControllers[index],
+                          focusNode: _focusNodes[index],
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
                           maxLength: 1,
@@ -109,7 +125,9 @@ class _MobileOtpVerifyScreenState extends State<MobileOtpVerifyScreen> {
                           ),
                           onChanged: (value) {
                             if (value.length == 1 && index < 5) {
-                              FocusScope.of(context).nextFocus();
+                              _focusNodes[index + 1].requestFocus();
+                            } else if (value.isEmpty && index > 0) {
+                              _focusNodes[index - 1].requestFocus();
                             }
                             if (_otpControllers.every((c) => c.text.length == 1)) {
                               Navigator.pushNamed(context, '/register-mobile-details');
@@ -150,6 +168,7 @@ class _MobileOtpVerifyScreenState extends State<MobileOtpVerifyScreen> {
   void dispose() {
     _timer?.cancel();
     _otpControllers.forEach((c) => c.dispose());
+    _focusNodes.forEach((f) => f.dispose());
     super.dispose();
   }
 }

@@ -37,8 +37,29 @@ class _RegisterOptionsScreenState extends State<RegisterOptionsScreen> {
                     child: const Text('←', style: TextStyle(fontSize: 26, color: Color(0xFF0D2240))),
                   ),
                   const Spacer(),
-                  const TranslatedText('Create ABHA',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0D2240)),
+                  Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D2240),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Image.asset(
+                            'assets/images/curenet_logo.png',
+                            width: 20,
+                            height: 20,
+                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.health_and_safety, size: 20, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const TranslatedText('Create ABHA',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0D2240)),
+                      ),
+                    ],
                   ),
                   const Spacer(),
                 ],

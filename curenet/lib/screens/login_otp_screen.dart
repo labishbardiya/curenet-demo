@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../core/theme.dart';
 import '../core/translated_text.dart';
+import '../core/abdm_crypto.dart';
+import '../services/abdm_service.dart';
+import 'package:flutter/services.dart';
 import 'package:curenet/core/navigation_helper.dart';
 
 class LoginOtpScreen extends StatefulWidget {
@@ -13,15 +16,43 @@ class LoginOtpScreen extends StatefulWidget {
 
 class _LoginOtpScreenState extends State<LoginOtpScreen> {
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  late final List<FocusNode> _focusNodes;
   String _otp = '';
   int _timerSeconds = 30;
   Timer? _timer;
   bool _showError = false;
+  bool _isLoading = false;
+  String? _txnId;
+  String? _loginId;
+  String? _authMethod;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (args != null && _txnId == null) {
+      _authMethod = args['authMethod'] as String? ?? 'Mobile OTP';
+      _loginId = args['loginId'] as String? ?? '+91 98765 43210';
+      _txnId = args['txnId'] as String?;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _focusNodes = List.generate(6, (index) => FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (_controllers[index].text.isEmpty && index > 0) {
+            _focusNodes[index - 1].requestFocus();
+            _controllers[index - 1].clear();
+            _onOtpChanged(index - 1, '');
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    ));
     _startTimer();
     // Auto-focus first box
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusNodes[0].requestFocus());
@@ -47,21 +78,60 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
 
     if (value.isNotEmpty && index < 5) {
       _focusNodes[index + 1].requestFocus();
+    } else if (value.isEmpty && index > 0) {
+      _focusNodes[index - 1].requestFocus();
     }
     if (_otp.length == 6) {
       _verifyOtp();
     }
   }
 
-  void _verifyOtp() {
+  Future<void> _verifyOtp() async {
+    setState(() {
+      _isLoading = true;
+      _showError = false;
+    });
+
+    try {
+      // If we have a transaction ID from M1 ABDM Sandbox, try validating it live
+      if (_txnId != null) {
+        final keyMap = await AbdmService.getPublicKey();
+        final String publicKey = keyMap['publicKey'];
+        final String encryptedOtp = AbdmCrypto.encryptRsa(_otp, publicKey);
+
+        final response = await AbdmService.verifyAadhaarOtp(
+          txnId: _txnId!,
+          encryptedOtp: encryptedOtp,
+          mobile: _loginId ?? '',
+        );
+
+        // Verification successful, X-Token acts as authorization
+        print("ABDM Verification Success: ${response['authData']}");
+        _timer?.cancel();
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+        return;
+      }
+    } catch (e) {
+      print("ABDM M1 OTP Verification failed (Sandbox Offline): $e");
+    }
+
+    // Fallback: Local Simulation if Sandbox is offline or no txnId
     if (_otp == '123456') {
       _timer?.cancel();
+      if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     } else {
-      setState(() => _showError = true);
+      if (!mounted) return;
+      setState(() {
+        _showError = true;
+        _isLoading = false;
+      });
       // Clear on error
       Future.delayed(const Duration(milliseconds: 800), () {
-        for (var c in _controllers) c.clear();
+        for (var c in _controllers) {
+          c.clear();
+        }
         _focusNodes[0].requestFocus();
         setState(() => _showError = false);
       });
@@ -78,10 +148,6 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final String authMethod = args?['authMethod'] as String? ?? 'Mobile OTP';
-    final String loginId = args?['loginId'] as String? ?? '+91 98765 43210';
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
@@ -126,12 +192,12 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
 
                   const SizedBox(height: 24),
                   TranslatedText(
-                    "6-digit $authMethod sent to",
+                    "6-digit ${_authMethod ?? 'Mobile OTP'} sent to",
                     style: const TextStyle(fontSize: 13, color: Color(0xFF5A6880)),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    loginId,
+                    _loginId ?? '+91 98765 43210',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0D2240)),
                   ),
 

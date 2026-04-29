@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/app_config.dart';
 
 /// ABDM Sandbox integration – M1 (ABHA creation/verification), M2 (HIP), M3 (HIU).
 /// Strictly follows: ABDM_ABHA_V3_AP_Is_V1_31_07_2025 PDF + AyushmanNHA YouTube workflows.
@@ -20,6 +21,15 @@ class AbdmService {
 
   static void setBaseUrl(String url) => _baseUrl = url;
   static void setAccessToken(String token) => _accessToken = token;
+
+  /// Ensures a valid session token exists before calling an authenticated API.
+  static Future<void> _ensureAuth() async {
+    if (_accessToken != null) return;
+    await createSession(
+      clientId: AppConfig.abdmClientId, 
+      clientSecret: AppConfig.abdmClientSecret
+    );
+  }
 
   /// M1 – Get public key for RSA encryption (Aadhaar, OTP, mobile, email).
   /// GET, no auth. Key expires in 3 months – refresh before expiry.
@@ -67,7 +77,25 @@ class AbdmService {
     return map;
   }
 
-  /// M1 – Request OTP for ABHA enrollment via Aadhaar.
+  /// M1 – Generate Registration OTP for ABHA creation.
+  /// Requires Aadhaar number encrypted with the public key.
+  static Future<Map<String, dynamic>> generateAadhaarOtpForRegistration({
+    required String encryptedAadhaar,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/v2/registration/aadhaar/generateOtp');
+    return _postWithAuth(uri, {'aadhaar': encryptedAadhaar});
+  }
+
+  /// M1 – Verify Registration OTP.
+  static Future<Map<String, dynamic>> verifyAadhaarOtpForRegistration({
+    required String txnId,
+    required String encryptedOtp,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/v2/registration/aadhaar/verifyOTP');
+    return _postWithAuth(uri, {'otp': encryptedOtp, 'txnId': txnId});
+  }
+
+  /// M1 – Request OTP for ABHA Verification / Login.
   /// loginId must be encrypted with public key (SHA1 + MGF1 padding per guide).
   static Future<Map<String, dynamic>> requestAadhaarOtp({
     required String encryptedAadhaar,
@@ -153,7 +181,6 @@ class AbdmService {
     return response.bodyBytes;
   }
 
-  /// M1 – Scan & share: Register bridge/callback URL for facility (HIP).
   static Future<void> updateBridgeUrl({
     required String callbackUrl,
   }) async {
@@ -161,7 +188,62 @@ class AbdmService {
     await _postWithAuth(uri, {'url': callbackUrl});
   }
 
+  /// M2 – Link Care Context: Associates patient records with ABHA.
+  static Future<Map<String, dynamic>> linkCareContext({
+    required String abhaAddress,
+    required String patientReference,
+    required List<Map<String, String>> careContexts,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/hiecm/hip/v3/link/carecontext');
+    final body = {
+      'accessToken': _accessToken,
+      'abhaAddress': abhaAddress,
+      'patientReference': patientReference,
+      'careContexts': careContexts,
+    };
+    return _postWithAuth(uri, body);
+  }
+
+  /// M2 – Consent on-notify: Acknowledges receipt of consent artefact from Gateway.
+  static Future<Map<String, dynamic>> acknowledgeConsent({
+    required String requestId,
+    required String consentId,
+    required String status,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/hiecm/consent/v3/request/hip/on-notify');
+    final body = {
+      'requestId': requestId,
+      'timestamp': DateTime.now().toUtc().toIso8601String(),
+      'acknowledgement': {
+        'status': status,
+        'consentId': consentId,
+      },
+      'resp': {'requestId': requestId},
+    };
+    return _postWithAuth(uri, body);
+  }
+
+  /// M2 – Data on-request: Resolves a health information request from HIU.
+  static Future<Map<String, dynamic>> respondToDataRequest({
+    required String requestId,
+    required String transactionId,
+    required String acknowledgementStatus,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/hiecm/data-flow/v3/health-information/hip/on-request');
+    final body = {
+      'requestId': requestId,
+      'timestamp': DateTime.now().toUtc().toIso8601String(),
+      'hiRequest': {
+        'transactionId': transactionId,
+        'sessionStatus': acknowledgementStatus,
+      },
+      'resp': {'requestId': requestId},
+    };
+    return _postWithAuth(uri, body);
+  }
+
   static Future<Map<String, dynamic>> _postWithAuth(Uri uri, Map<String, dynamic> body) async {
+    await _ensureAuth();
     final requestId = _newGuid();
     final timestamp = DateTime.now().toUtc().toIso8601String();
     final response = await http.post(
@@ -182,6 +264,7 @@ class AbdmService {
   }
 
   static Future<Map<String, dynamic>> _getWithAuth(Uri uri, {Map<String, String>? extraHeaders}) async {
+    await _ensureAuth();
     final requestId = _newGuid();
     final timestamp = DateTime.now().toUtc().toIso8601String();
     final headers = {

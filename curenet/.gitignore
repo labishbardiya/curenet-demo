@@ -12,6 +12,7 @@
 .swiftpm/
 migrate_working_dir/
 
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -41,8 +42,13 @@ app.*.map.json
 
 # Ignore AI_chat.txt
 AI_chat.txt
+Getting Started with ABDM.pdf
 
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Presentation Notes (Internal Only)
+PRESENTATION_NOTES.md
+.env

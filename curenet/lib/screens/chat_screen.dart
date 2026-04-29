@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../core/voice_helper.dart';
 import '../core/translated_text.dart';
+import '../core/app_language.dart';
+import '../services/ai_service.dart';
+import 'dart:convert';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:curenet/core/navigation_helper.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -14,38 +20,149 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isTyping = false;
+  bool _isListening = false;
 
-  final List<Map<String, dynamic>> _messages = [
-    {
-      "role": "bot",
-      "text": "Namaste Priya! I'm Abhya, your personal health assistant. How can I help you today?"
-    },
-  ];
+  List<Map<String, dynamic>> _messages = [];
+  List<Map<String, dynamic>> _sessions = [];
+  String _currentSessionId = "";
 
-  final Map<String, String> _sampleResponses = {
-    "What medications am I on?": "You're currently on **Amlodipine 5mg** once daily for hypertension. Last prescribed by Dr. Meena Kapoor on 22 Feb 2026. Take it every morning with water.",
-    "Is my BP under control?": "Your last BP reading was **142/90 mmHg** (Stage 1). It's improving with medication. Keep monitoring and follow up with Dr. Kapoor in 4 weeks.",
-    "When is my next appointment?": "Your cardiology follow-up with Dr. Meena Kapoor is due by **22 March 2026**. Would you like me to show the details?",
-  };
+  @override
+  void initState() {
+    super.initState();
+    AiService.init();
+    _loadHistory();
+  }
 
-  void _sendMessage() {
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? sessionsJson = prefs.getString('chat_sessions');
+    
+    if (sessionsJson != null && sessionsJson.isNotEmpty) {
+      final List<dynamic> decoded = jsonDecode(sessionsJson);
+      _sessions = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    
+    if (_sessions.isEmpty) {
+      // Migrate old format if exists
+      final String? oldHistory = prefs.getString('chat_history');
+      if (oldHistory != null && oldHistory.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(oldHistory);
+        _messages = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+        _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
+        _sessions.add({
+          "id": _currentSessionId,
+          "title": "Previous Chat",
+          "messages": _messages,
+        });
+        await _saveHistory();
+        setState(() {});
+        _scrollToBottom();
+      } else {
+        _createNewSession();
+      }
+    } else {
+      _currentSessionId = _sessions.last['id'] as String;
+      _messages = List<Map<String, dynamic>>.from(_sessions.last['messages']);
+      setState(() {});
+      _scrollToBottom();
+    }
+  }
+
+  void _createNewSession() {
+    final newId = DateTime.now().millisecondsSinceEpoch.toString();
+    _currentSessionId = newId;
+    _messages = [
+      {
+        "role": "bot",
+        "text": "Namaste Priya! I'm Abhya, your personal health assistant. How can I help you today?"
+      },
+    ];
+    _sessions.add({
+      "id": newId,
+      "title": "New Chat",
+      "messages": _messages,
+    });
+    setState(() {});
+    _saveHistory();
+  }
+
+  void _switchSession(String id) {
+    final session = _sessions.firstWhere((s) => s['id'] == id);
+    setState(() {
+      _currentSessionId = id;
+      _messages = List<Map<String, dynamic>>.from(session['messages']);
+    });
+    _scrollToBottom();
+  }
+
+  Future<void> _saveHistory() async {
+    if (_messages.length > 1) {
+      final sessionIndex = _sessions.indexWhere((s) => s['id'] == _currentSessionId);
+      if (sessionIndex != -1) {
+        if (_sessions[sessionIndex]['title'] == "New Chat") {
+           final firstUserMsg = _messages.firstWhere((m) => m['role'] == 'user', orElse: () => {"text": "New Chat"})['text'] as String;
+           final title = (firstUserMsg.length > 20) ? "\${firstUserMsg.substring(0, 20)}..." : firstUserMsg;
+           _sessions[sessionIndex]['title'] = title;
+        }
+        _sessions[sessionIndex]['messages'] = _messages;
+      }
+    }
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('chat_sessions', jsonEncode(_sessions));
+  }
+
+  void _listen() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onStatus: (val) {
+          if (val == 'done' || val == 'notListening') {
+            setState(() => _isListening = false);
+          }
+        },
+        onError: (val) => print('onError: \$val'),
+      );
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (val) => setState(() {
+            _controller.text = val.recognizedWords;
+          }),
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
+      if (_controller.text.isNotEmpty) {
+        _sendMessage();
+      }
+    }
+  }
+
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
     setState(() {
       _messages.add({"role": "user", "text": text});
+      _isTyping = true;
     });
+    _saveHistory();
     _controller.clear();
     _scrollToBottom();
 
-    Future.delayed(const Duration(milliseconds: 600), () {
-      final reply = _sampleResponses[text] ??
-          "Based on your records, that's a great question! Let me check... For anything specific, I recommend discussing with your doctor. How else can I help?";
-      setState(() {
-        _messages.add({"role": "bot", "text": reply});
-      });
-      _scrollToBottom();
+    final languageCode = AppLanguage.selectedLanguage.value;
+    final reply = await AiService.sendMessage(text, language: languageCode);
+    
+    if (!mounted) return;
+    setState(() {
+      _messages.add({"role": "bot", "text": reply});
+      _isTyping = false;
     });
+    _saveHistory();
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -58,22 +175,26 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _sendStarter(String question) {
+  Future<void> _sendStarter(String question) async {
     setState(() {
       _messages.add({"role": "user", "text": question});
+      _isTyping = true;
     });
+    _saveHistory();
     _scrollToBottom();
 
-    Future.delayed(const Duration(milliseconds: 700), () {
-      final reply = _sampleResponses[question] ?? "Thank you for asking! Here's what I found in your records...";
-      setState(() {
-        _messages.add({"role": "bot", "text": reply});
-      });
-      _scrollToBottom();
+    final languageCode = AppLanguage.selectedLanguage.value;
+    final reply = await AiService.sendMessage(question, language: languageCode);
+    
+    if (!mounted) return;
+    setState(() {
+      _messages.add({"role": "bot", "text": reply});
+      _isTyping = false;
     });
+    _saveHistory();
+    _scrollToBottom();
   }
 
-  // NEW: Message bubble with speaker icon
   Widget _buildMessageBubble(Map<String, dynamic> msg) {
     final isUser = msg["role"] == "user";
     final text = msg["text"] as String;
@@ -88,7 +209,8 @@ class _ChatScreenState extends State<ChatScreen> {
             IconButton(
               icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 20),
               onPressed: () async {
-                final ok = await VoiceHelper.speak(text);
+                final plainText = text.replaceAll(RegExp(r'\*|#'), '');
+                final ok = await VoiceHelper.speak(plainText);
                 if (!ok && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -119,14 +241,29 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
             ),
-            child: TranslatedText(
-              text,
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.5,
-                color: isUser ? Colors.white : const Color(0xFF0D2240),
-              ),
-            ),
+            child: isUser
+                ? TranslatedText(
+                    text,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.5,
+                      color: Colors.white,
+                    ),
+                  )
+                : MarkdownBody(
+                    data: text,
+                    styleSheet: MarkdownStyleSheet(
+                      p: const TextStyle(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: Color(0xFF0D2240),
+                      ),
+                      strong: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF00A3A3),
+                      ),
+                    ),
+                  ),
           ),
           if (isUser)
             IconButton(
@@ -182,7 +319,47 @@ Widget build(BuildContext context) {
                 ],
               ),
               const Spacer(),
-              const Icon(Icons.more_horiz, color: Color(0xFF9BA8BB)),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_horiz, color: Color(0xFF9BA8BB)),
+                onSelected: (value) {
+                  if (value == 'new') {
+                    _createNewSession();
+                  } else {
+                    _switchSession(value);
+                  }
+                },
+                itemBuilder: (context) {
+                  List<PopupMenuEntry<String>> items = [
+                    const PopupMenuItem(
+                      value: 'new',
+                      child: Row(
+                        children: [
+                          Icon(Icons.add, size: 18),
+                          SizedBox(width: 8),
+                          Text("New Chat"),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                  ];
+                  
+                  // Add past sessions in reverse order (newest first)
+                  for (var session in _sessions.reversed) {
+                    items.add(
+                      PopupMenuItem(
+                        value: session['id'] as String,
+                        child: Text(
+                          session['title'] as String,
+                          style: TextStyle(
+                            fontWeight: session['id'] == _currentSessionId ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  return items;
+                },
+              ),
             ],
           ),
         ),
@@ -193,70 +370,26 @@ Widget build(BuildContext context) {
           child: ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.all(16),
-            itemCount: _messages.length,
+            itemCount: _messages.length + (_isTyping ? 1 : 0),
             itemBuilder: (context, index) {
-              final msg = _messages[index];
-              final isUser = msg["role"] == "user";
-              return Align(
-                alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!isUser)
-                      IconButton(
-                        icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 22),
-                        onPressed: () async {
-                          final ok = await VoiceHelper.speak(msg["text"]);
-                          if (!ok && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(VoiceHelper.lastError ?? 'Voice readout failed.'),
-                                backgroundColor: const Color(0xFF0D2240),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: isUser ? const Color(0xFF00A3A3) : Colors.white,
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(18),
-                          topRight: const Radius.circular(18),
-                          bottomLeft: Radius.circular(isUser ? 18 : 4),
-                          bottomRight: Radius.circular(isUser ? 4 : 18),
-                        ),
-                      ),
-                      child: TranslatedText(
-                        msg["text"],
-                        style: TextStyle(
-                          fontSize: 15,
-                          height: 1.5,
-                          color: isUser ? Colors.white : const Color(0xFF0D2240),
-                        ),
+              if (index == _messages.length) {
+                return const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 12, left: 40),
+                    child: SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00A3A3)),
                       ),
                     ),
-                    if (isUser)
-                      IconButton(
-                        icon: const Icon(Icons.volume_up, color: Color(0xFF00A3A3), size: 22),
-                        onPressed: () async {
-                          final ok = await VoiceHelper.speak(msg["text"]);
-                          if (!ok && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(VoiceHelper.lastError ?? 'Voice readout failed.'),
-                                backgroundColor: const Color(0xFF0D2240),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                  ],
-                ),
-              );
+                  ),
+                );
+              }
+              final msg = _messages[index];
+              return _buildMessageBubble(msg);
             },
           ),
         ),
@@ -272,9 +405,10 @@ Widget build(BuildContext context) {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _starterChip("What medications am I on?"),
-                _starterChip("Is my BP under control?"),
-                _starterChip("When is my next appointment?"),
+                _starterChip("Emergency Snapshot"),
+                _starterChip("Simplify my latest lab report"),
+                _starterChip("Any side effects with my medicines?"),
+                _starterChip("Summarize my last doctor's visit"),
               ],
             ),
           ),
@@ -303,6 +437,25 @@ Widget build(BuildContext context) {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                     ),
                     onSubmitted: (_) => _sendMessage(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _listen,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _isListening ? Colors.redAccent : const Color(0xFFE8F7F7),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        _isListening ? Icons.mic : Icons.mic_none,
+                        color: _isListening ? Colors.white : const Color(0xFF00A3A3),
+                        size: 24,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),

@@ -77,11 +77,18 @@ class LoginOptionsScreen extends StatelessWidget {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(28),
                             ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.health_and_safety,
-                                size: 32,
-                                color: Color(0xFF0D2240),
+                            child: Center(
+                              child: Image.asset(
+                                'assets/images/curenet_logo.png',
+                                width: 32,
+                                height: 32,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(
+                                    Icons.health_and_safety,
+                                    size: 32,
+                                    color: Color(0xFF0D2240),
+                                  );
+                                },
                               ),
                             ),
                           ),

@@ -5,22 +5,33 @@
 ///   flutter run --dart-define=BHASHINI_API_KEY=your_inference_api_key
 /// Or set in IDE: Run > Edit Configurations > Additional run args.
 class AppConfig {
-  /// Bhashini Inference API Key (from dashboard.bhashini.co.in).
-  /// Used for TTS /synthesize and other inference APIs.
+  /// Groq API Key
+  static String get groqApiKey =>
+      const String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
+
+  /// Tavily API Key
+  static String get tavilyApiKey =>
+      const String.fromEnvironment('TAVILY_API_KEY', defaultValue: '');
+
+  /// ABDM Sandbox Client ID (Bridge ID)
+  static String get abdmClientId =>
+      const String.fromEnvironment('ABDM_CLIENT_ID', defaultValue: '');
+
+  /// ABDM Sandbox Client Secret
+  static String get abdmClientSecret =>
+      const String.fromEnvironment('ABDM_CLIENT_SECRET', defaultValue: '');
+
+  /// Bhashini Inference API Key
   static String get bhashiniApiKey =>
-      String.fromEnvironment('BHASHINI_API_KEY', defaultValue: '');
+      const String.fromEnvironment('BHASHINI_API_KEY', defaultValue: '');
 
-  /// Bhashini Udyam Key (optional; from dashboard if needed for other APIs).
-  static String get bhashiniUdyamKey =>
-      String.fromEnvironment('BHASHINI_UDYAM_KEY', defaultValue: '');
+  /// Bhashini User ID
+  static String get bhashiniUserId =>
+      const String.fromEnvironment('BHASHINI_USER_ID', defaultValue: '');
 
-  /// Bhashini Client ID (from dashboard.bhashini.co.in).
-  static String get bhashiniClientId =>
-      String.fromEnvironment('BHASHINI_CLIENT_ID', defaultValue: '');
-
-  /// Bhashini Client Secret (optional; from dashboard if needed for other APIs).
-  static String get bhashiniClientSecret =>
-      String.fromEnvironment('BHASHINI_CLIENT_SECRET', defaultValue: '');
+  /// Bhashini Auth (Authorization)
+  static String get bhashiniAuth =>
+      const String.fromEnvironment('BHASHINI_AUTH', defaultValue: '');
 
   static bool get hasBhashiniKey => bhashiniApiKey.isNotEmpty;
 }

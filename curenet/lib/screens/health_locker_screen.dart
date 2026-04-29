@@ -3,8 +3,32 @@ import '../core/theme.dart';
 import 'package:curenet/core/navigation_helper.dart';
 import '../core/translated_text.dart';
 
-class HealthLockerScreen extends StatelessWidget {
+class HealthLockerScreen extends StatefulWidget {
   const HealthLockerScreen({super.key});
+
+  @override
+  State<HealthLockerScreen> createState() => _HealthLockerScreenState();
+}
+
+class _HealthLockerScreenState extends State<HealthLockerScreen> {
+  // Map to track which records are "Unlocked"
+  final Map<String, bool> _unlockedRecords = {};
+  bool _isExporting = false;
+
+  void _toggleLock(String title) {
+    setState(() {
+      _unlockedRecords[title] = !(_unlockedRecords[title] ?? false);
+    });
+    
+    final status = _unlockedRecords[title]! ? "Unlocked" : "Locked";
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: TranslatedText("$title is now $status"),
+        backgroundColor: _unlockedRecords[title]! ? const Color(0xFF22A36A) : const Color(0xFF00A3A3),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,12 +98,15 @@ class HealthLockerScreen extends StatelessWidget {
                   ),
 
                   // Records in Locker
-                  const TranslatedText("RECORDS IN LOCKER",
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF9BA8BB),
-                      letterSpacing: 0.5,
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: TranslatedText("RECORDS IN LOCKER",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF9BA8BB),
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -89,29 +116,25 @@ class HealthLockerScreen extends StatelessWidget {
                     icon: Icons.science,
                     title: "Blood Test Report",
                     date: "22 Feb 2026",
-                    status: "Encrypted",
-                    onTap: () {},
+                    onTap: () => _toggleLock("Blood Test Report"),
                   ),
                   _lockerCard(
                     icon: Icons.medication,
                     title: "Prescription - Hypertension",
                     date: "18 Feb 2026",
-                    status: "Encrypted",
-                    onTap: () {},
+                    onTap: () => _toggleLock("Prescription - Hypertension"),
                   ),
                   _lockerCard(
                     icon: Icons.medical_services,
                     title: "Chest X-Ray",
                     date: "05 Feb 2026",
-                    status: "Encrypted",
-                    onTap: () {},
+                    onTap: () => _toggleLock("Chest X-Ray"),
                   ),
                   _lockerCard(
                     icon: Icons.favorite,
                     title: "ECG Report",
                     date: "15 Jan 2026",
-                    status: "Encrypted",
-                    onTap: () {},
+                    onTap: () => _toggleLock("ECG Report"),
                   ),
 
                   const SizedBox(height: 24),
@@ -126,11 +149,11 @@ class HealthLockerScreen extends StatelessWidget {
                   ),
 
                   _buildActionCard(
-                    icon: Icons.upload,
-                    title: "Export to ABDM",
+                    icon: _isExporting ? Icons.sync : Icons.upload,
+                    title: _isExporting ? "Exporting..." : "Export to ABDM",
                     subtitle: "Share with other ABDM apps (HIP push)",
                     color: const Color(0xFF22A36A),
-                    onTap: () => _showExportDialog(context),
+                    onTap: () => _isExporting ? null : _showExportDialog(context),
                   ),
 
                   const SizedBox(height: 20),
@@ -166,9 +189,10 @@ class HealthLockerScreen extends StatelessWidget {
     required IconData icon,
     required String title,
     required String date,
-    required String status,
     required VoidCallback onTap,
   }) {
+    final bool isUnlocked = _unlockedRecords[title] ?? false;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -177,7 +201,7 @@ class HealthLockerScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFD8DDE6)),
+          border: Border.all(color: isUnlocked ? const Color(0xFF22A36A).withOpacity(0.5) : const Color(0xFFD8DDE6)),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
         ),
         child: Row(
@@ -186,10 +210,10 @@ class HealthLockerScreen extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F7F7),
+                color: isUnlocked ? const Color(0xFFE6F7EF) : const Color(0xFFE8F7F7),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Center(child: Icon(icon, size: 24, color: const Color(0xFF00A3A3))),
+              child: Center(child: Icon(icon, size: 24, color: isUnlocked ? const Color(0xFF22A36A) : const Color(0xFF00A3A3))),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -207,15 +231,15 @@ class HealthLockerScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE6F7EF),
+                    color: isUnlocked ? const Color(0xFFE6F7EF) : const Color(0xFFF5F7FA),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const TranslatedText("Locked",
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF22A36A)),
+                  child: TranslatedText(isUnlocked ? "Unlocked" : "Locked",
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isUnlocked ? const Color(0xFF22A36A) : const Color(0xFF9BA8BB)),
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.lock_outline, size: 18, color: Color(0xFF9BA8BB)),
+                Icon(isUnlocked ? Icons.lock_open : Icons.lock_outline, size: 18, color: isUnlocked ? const Color(0xFF22A36A) : const Color(0xFF9BA8BB)),
               ],
             ),
           ],
@@ -311,9 +335,15 @@ class HealthLockerScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: TranslatedText("✅ Records exported to ABDM"), backgroundColor: Color(0xFF22A36A)),
-              );
+              setState(() => _isExporting = true);
+              Future.delayed(const Duration(seconds: 2), () {
+                if (mounted) {
+                  setState(() => _isExporting = false);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: TranslatedText("✅ Records exported to ABDM successfully"), backgroundColor: Color(0xFF22A36A)),
+                  );
+                }
+              });
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF22A36A)),
             child: const TranslatedText("Export"),
