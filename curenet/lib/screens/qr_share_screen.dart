@@ -126,14 +126,35 @@ class QrShareScreen extends StatelessWidget {
                   const SizedBox(height: 32),
 
                   ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/access-req'),
+                    onPressed: () => Navigator.pushNamed(context, '/emergency-snapshot'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D2240),
+                      backgroundColor: const Color(0xFFD32F2F), // Emergency Red
                       minimumSize: const Size(double.infinity, 58),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const TranslatedText("Show QR to Doctor",
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.emergency, color: Colors.white),
+                        SizedBox(width: 10),
+                        TranslatedText("Download Emergency Snapshot",
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  OutlinedButton(
+                    onPressed: () => Navigator.pushNamed(context, '/access-req'),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF0D2240), width: 2),
+                      minimumSize: const Size(double.infinity, 58),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const TranslatedText("Show Scan & Share QR",
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF0D2240)),
                     ),
                   ),
                 ],

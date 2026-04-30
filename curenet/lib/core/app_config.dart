@@ -34,4 +34,18 @@ class AppConfig {
       const String.fromEnvironment('BHASHINI_AUTH', defaultValue: '');
 
   static bool get hasBhashiniKey => bhashiniApiKey.isNotEmpty;
+
+  // ─── OCR API Configuration ─────────────────────────────────────────────────
+  /// Production OCR URL (replace with actual cloud endpoint once deployed)
+  static const String _ocrProductionUrl = 'https://api.curenet.in/api/ocr';
+
+  /// Development OCR URL (use your machine's local IP for device testing)
+  static const String _ocrDevelopmentUrl = 'http://192.168.1.3:3000/api/ocr';
+
+  /// Toggle between production and development OCR endpoints
+  static const bool isOcrProduction = false;
+
+  static String get ocrApiUrl =>
+      isOcrProduction ? _ocrProductionUrl : _ocrDevelopmentUrl;
 }
+

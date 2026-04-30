@@ -3,8 +3,11 @@ import '../core/theme.dart';
 import '../core/voice_helper.dart';
 import 'package:curenet/core/navigation_helper.dart';
 import '../core/translated_text.dart';
+import '../core/data_mode.dart';
+import '../core/persona.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:fl_chart/fl_chart.dart';
 
 class RecordsScreen extends StatefulWidget {
   const RecordsScreen({super.key});
@@ -15,7 +18,7 @@ class RecordsScreen extends StatefulWidget {
 
 class _RecordsScreenState extends State<RecordsScreen> {
   int activeTab = 0;
-  final List<String> tabs = ["All", "Prescriptions", "Labs", "Reports"];
+  final List<String> tabs = ["All", "Trends", "Prescriptions", "Labs", "Reports"];
   List<Map<String, dynamic>> allRecords = [];
   bool _isLoading = true;
 
@@ -23,30 +26,114 @@ class _RecordsScreenState extends State<RecordsScreen> {
   void initState() {
     super.initState();
     _loadRecords();
+    DataMode.isDemo.addListener(_loadRecords);
+  }
+
+  @override
+  void dispose() {
+    DataMode.isDemo.removeListener(_loadRecords);
+    super.dispose();
   }
 
   Future<void> _loadRecords() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? recordsJson = prefs.getString('health_records');
-    
-    if (recordsJson != null && recordsJson.isNotEmpty) {
-      final List<dynamic> decoded = jsonDecode(recordsJson);
-      setState(() {
-        allRecords = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
-        _isLoading = false;
-      });
-    } else {
-      // Initial dummy data
+    if (DataMode.isDemo.value) {
+      // DEMO MODE: Hardcoded Priya Sharma records
       allRecords = [
-        {"title": "Blood Test Report", "date": "22 Feb 2026", "doctor": "Dr. Meena Kapoor", "type": "science", "color": "#00A3A3", "category": "Labs"},
-        {"title": "Prescription - Hypertension", "date": "18 Feb 2026", "doctor": "Dr. Suresh Kumar", "type": "medication", "color": "#E07B39", "category": "Prescriptions"},
-        {"title": "Chest X-Ray", "date": "05 Feb 2026", "doctor": "Dr. Anjali Mehta", "type": "medical_services", "color": "#6B4E9B", "category": "Reports"},
-        {"title": "Lipid Profile", "date": "28 Jan 2026", "doctor": "Dr. Meena Kapoor", "type": "science", "color": "#00A3A3", "category": "Labs"},
-        {"title": "ECG Report", "date": "15 Jan 2026", "doctor": "Dr. Suresh Kumar", "type": "favorite", "color": "#D63B3B", "category": "Reports"},
+        {
+          "title": "HbA1c & Blood Glucose",
+          "date": "14 Mar 2026",
+          "doctor": "Dr. Meena Kapoor",
+          "type": "science",
+          "color": "#00A3A3",
+          "category": "Labs",
+          "value": 6.2,
+          "unit": "%",
+          "marker": "Glucose",
+          "summary": "HbA1c is 6.2% (Pre-diabetic range). Fasting glucose is 110 mg/dL. Management required."
+        },
+        {
+          "title": "Thyroid Profile (TSH)",
+          "date": "28 Feb 2026",
+          "doctor": "Dr. Suresh Kumar",
+          "type": "science",
+          "color": "#E07B39",
+          "category": "Labs",
+          "value": 3.8,
+          "unit": "uIU/mL",
+          "marker": "TSH",
+          "summary": "TSH is 3.8 uIU/mL. Within normal range (0.4 - 4.0)."
+        },
+        {
+          "title": "Prescription: Amlodipine",
+          "date": "15 Feb 2026",
+          "doctor": "Dr. Suresh Kumar",
+          "type": "medication",
+          "color": "#E07B39",
+          "category": "Prescriptions",
+          "summary": "Prescribed Amlodipine 5mg for Hypertension. Take once daily after breakfast."
+        },
+        {
+          "title": "Prescription: Metformin",
+          "date": "20 Sep 2025",
+          "doctor": "Dr. Suresh Kumar",
+          "type": "medication",
+          "color": "#E07B39",
+          "category": "Prescriptions",
+          "summary": "Prescribed Metformin 500mg for Type 2 Diabetes. Twice daily after meals."
+        },
+        {
+          "title": "Diabetic Retinopathy Screening",
+          "date": "10 Jan 2026",
+          "doctor": "Dr. Anjali Mehta",
+          "type": "medical_services",
+          "color": "#6B4E9B",
+          "category": "Reports",
+          "summary": "Routine eye checkup. No signs of retinopathy detected. Vision stable."
+        },
+        {
+          "title": "Lipid Profile",
+          "date": "15 Dec 2025",
+          "doctor": "Dr. Meena Kapoor",
+          "type": "science",
+          "color": "#00A3A3",
+          "category": "Labs",
+          "value": 185,
+          "unit": "mg/dL",
+          "marker": "Cholesterol",
+          "summary": "Total Cholesterol: 185 mg/dL. LDL: 110 mg/dL. HDL: 52 mg/dL. Good control."
+        },
+        {
+          "title": "ECG Report - Normal",
+          "date": "05 Nov 2025",
+          "doctor": "Dr. Suresh Kumar",
+          "type": "favorite",
+          "color": "#D63B3B",
+          "category": "Reports",
+          "summary": "Resting ECG shows normal sinus rhythm. No significant ST-T changes."
+        },
+        {
+          "title": "Prescription: Atorvastatin",
+          "date": "15 Dec 2025",
+          "doctor": "Dr. Meena Kapoor",
+          "type": "medication",
+          "color": "#E07B39",
+          "category": "Prescriptions",
+          "summary": "Prescribed Atorvastatin 10mg for Cholesterol. Once daily at night."
+        },
       ];
-      _saveRecords();
-      setState(() => _isLoading = false);
+    } else {
+      // LIVE MODE: Read from SharedPreferences (real uploads)
+      final prefs = await SharedPreferences.getInstance();
+      final String? savedData = prefs.getString('health_records');
+      if (savedData != null) {
+        allRecords = List<Map<String, dynamic>>.from(
+          (jsonDecode(savedData) as List).map((e) => Map<String, dynamic>.from(e)),
+        );
+      } else {
+        allRecords = [];
+      }
     }
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _saveRecords() async {
@@ -100,6 +187,75 @@ class _RecordsScreenState extends State<RecordsScreen> {
     _saveRecords();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: TranslatedText("Record deleted"), backgroundColor: Color(0xFFD63B3B)),
+    );
+  }
+
+  Widget _buildTrendsView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildChartCard("Diabetes (HbA1c/Glucose)", "mmol/L", [5.8, 6.2, 5.2], ["Jan", "Feb", "Mar"]),
+          const SizedBox(height: 20),
+          _buildChartCard("Thyroid (TSH Level)", "uIU/mL", [4.5, 4.1, 3.8], ["Jan", "Feb", "Mar"]),
+          const SizedBox(height: 20),
+          _buildChartCard("Blood Pressure (Systolic)", "mmHg", [142, 138, 135], ["Jan", "Feb", "Mar"]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChartCard(String title, String unit, List<double> values, List<String> labels) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFD8DDE6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TranslatedText(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0D2240))),
+              Text("${values.last} $unit", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF00A3A3))),
+            ],
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 140,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(show: false),
+                titlesData: FlTitlesData(show: false),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: values.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
+                    isCurved: true,
+                    color: const Color(0xFF00A3A3),
+                    barWidth: 4,
+                    isStrokeCapRound: true,
+                    dotData: FlDotData(show: true),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: const Color(0xFF00A3A3).withOpacity(0.1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: labels.map((l) => Text(l, style: const TextStyle(fontSize: 12, color: Color(0xFF9BA8BB)))).toList(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -180,7 +336,9 @@ class _RecordsScreenState extends State<RecordsScreen> {
           Expanded(
             child: _isLoading 
               ? const Center(child: CircularProgressIndicator())
-              : filteredRecords.isEmpty 
+              : currentTab == "Trends"
+                ? _buildTrendsView()
+                : filteredRecords.isEmpty 
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,

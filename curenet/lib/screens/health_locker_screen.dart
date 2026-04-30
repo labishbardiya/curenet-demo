@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import 'package:curenet/core/navigation_helper.dart';
 import '../core/translated_text.dart';
+import '../services/biometric_service.dart';
 
 class HealthLockerScreen extends StatefulWidget {
   const HealthLockerScreen({super.key});
@@ -15,19 +16,40 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
   final Map<String, bool> _unlockedRecords = {};
   bool _isExporting = false;
 
-  void _toggleLock(String title) {
+  void _toggleLock(String title) async {
+    final bool isCurrentlyLocked = !(_unlockedRecords[title] ?? false);
+    
+    if (isCurrentlyLocked) {
+      // Check if biometrics available
+      final canBio = await BiometricService.canAuthenticate();
+      if (!canBio) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: TranslatedText("Biometric authentication not available on this device"), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+      
+      // Authenticate
+      final success = await BiometricService.authenticate(reason: "Unlock $title");
+      if (!success) return; // User cancelled or failed
+    }
+
     setState(() {
       _unlockedRecords[title] = !(_unlockedRecords[title] ?? false);
     });
     
     final status = _unlockedRecords[title]! ? "Unlocked" : "Locked";
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: TranslatedText("$title is now $status"),
-        backgroundColor: _unlockedRecords[title]! ? const Color(0xFF22A36A) : const Color(0xFF00A3A3),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TranslatedText("$title is now $status"),
+          backgroundColor: _unlockedRecords[title]! ? const Color(0xFF22A36A) : const Color(0xFF00A3A3),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   @override

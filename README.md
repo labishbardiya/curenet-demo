@@ -1,36 +1,44 @@
-
-
-
 # CureNet
 
-Senior-friendly, rural-first Flutter app (patient-owned ABHA Personal Health Record). Matches v5 HTML prototype; supports 22 Indian languages via Bhashini TTS.
+India's first ABDM-native health intelligence platform. CureNet integrates with the Ayushman Bharat Digital Mission (ABDM) to provide a unified, secure, and intelligent healthcare experience.
 
-## Run with Bhashini TTS (22 Indian languages)
+## Features
 
-Use your **Inference API Key** from [Bhashini Dashboard](https://dashboard.bhashini.co.in) (List of API Keys → Inference API Key Value):
+- **ABDM Integration:** Full support for ABHA creation, linking, and secure health data exchange (M1 & M2 compliant).
+- **ABHAy AI Assistant:** An intelligent health assistant that uses RAG (Retrieval-Augmented Generation) with your health records to provide personalized insights.
+- **Smart Health Locker:** Secure, biometrically protected storage for your medical documents.
+- **Clinical Data Extraction (OCR):** Automatically extract structured clinical data (FHIR R4) from photos of prescriptions and lab reports.
+- **Multilingual Support:** Accessible in English, Hindi, and Bengali with Bhashini translation and text-to-speech.
+- **Emergency Snapshot:** A quick, comprehensive view of critical health information for emergency situations.
 
-```bash
-flutter run --dart-define=BHASHINI_API_KEY=your_inference_api_key_here
-```
+## Prerequisites
 
-Optional: **Udyam Key** for other Bhashini APIs:
+- Flutter SDK `^3.11.0`
+- Access to ABDM Sandbox credentials
+- API keys for Groq, Tavily, and Bhashini
 
-```bash
-flutter run --dart-define=BHASHINI_API_KEY=... --dart-define=BHASHINI_UDYAM_KEY=...
-```
+## Setup
 
-Without these, the app falls back to device TTS (flutter_tts). Speaker icons appear on Chat, Records, Profile, QR Share, and Notifications.
+1. **Clone the repository.**
+2. **Install dependencies:**
+   ```bash
+   cd curenet
+   flutter pub get
+   ```
+3. **Run the app:**
+   You must provide the required API keys via `dart-define` or an environment configuration file:
+   ```bash
+   flutter run \
+     --dart-define=GROQ_API_KEY=your_groq_key \
+     --dart-define=TAVILY_API_KEY=your_tavily_key \
+     --dart-define=ABDM_CLIENT_ID=your_abdm_client_id \
+     --dart-define=ABDM_CLIENT_SECRET=your_abdm_client_secret \
+     --dart-define=BHASHINI_API_KEY=your_bhashini_key \
+     --dart-define=BHASHINI_USER_ID=your_bhashini_user \
+     --dart-define=BHASHINI_AUTH=your_bhashini_auth
+   ```
 
-## ABDM integration
+## Development Mode Toggle
 
-ABDM service layer is in `lib/services/abdm_service.dart`, following the **ABDM ABHA V3 APIs** guide and AyushmanNHA YouTube workflows:
-
-- **M1**: Session, get public key, Aadhaar OTP request/verify, ABHA address suggestion/confirm, profile, ABHA card, scan & share (bridge URL).
-- Base URL (sandbox): `https://dev.ndhm.gov.in/devservice/gateway`
-
-Use the attached **ABDM_ABHA_V3_AP_Is_V1_31_07_2025** PDF and sandbox Postman collection for exact endpoint paths and request bodies. Register your app on the [ABDM Sandbox](https://sandbox.abdm.gov.in) to get Client ID and Client Secret for `AbdmService.createSession()`.
-
-## Getting Started
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Flutter documentation](https://docs.flutter.dev/)
+The app includes a hidden development toggle to switch between demo data (hardcoded persona) and live local data:
+- On the **Home Screen**, **long-press** the greeting text ("Good morning, Priya") to open the toggle menu.

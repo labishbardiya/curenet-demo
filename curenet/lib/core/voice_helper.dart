@@ -13,7 +13,7 @@ class VoiceHelper {
   static Future<void> init() async {
     if (_initialized) return;
     await _tts.awaitSpeakCompletion(true);
-    await _tts.setSpeechRate(0.9);
+    await _tts.setSpeechRate(0.5);
     await _tts.setPitch(1.0);
     await _tts.setVolume(1.0);
     await _tts.setLanguage("en-IN");
@@ -41,7 +41,7 @@ class VoiceHelper {
       final ok = await BhashiniTtsService.synthesizeAndPlay(
         text: spokenText,
         language: lang,
-        speechRate: 0.9,
+        speechRate: 0.3,
       );
       if (ok) return true;
       lastError = 'Voice failed. Check internet or Bhashini API key.';

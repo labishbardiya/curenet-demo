@@ -1,14 +1,32 @@
 # Root .gitignore for CureNet
 
-# Project specific docs to ignore
+# Project specific docs and context to ignore
 COMPLETE_PROJECT_CONTEXT.md
 MIDTERM_REPORT.md
-.DS_Store
+CURENET_MINOR_PROJECT_REPORT.md
+PRESENTATION_NOTES.md
+Documentation/
+*.pdf
+*.docx
+*.xlsx
+curenet/report.js
+curenet.zip
 
-# Nested project ignores
+# Local Secrets & Environment
+.env
+.env.local
+.env.*.local
 curenet/.env
-curenet/PRESENTATION_NOTES.md
-curenet/AI_chat.txt
+curenet/.env.example
+secrets.json
+
+# System / IDE files
+.DS_Store
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
 
 # General Flutter/Dart ignores (Recursive)
 **/doc/api/
@@ -20,16 +38,23 @@ curenet/AI_chat.txt
 build/
 coverage/
 
-# IDE files
-.idea/
-*.iml
-*.ipr
-*.iws
-.vscode/
-
-# Mobile specific
+# Mobile specific build artifacts
 /android/app/debug
 /android/app/profile
 /android/app/release
 app.*.symbols
 app.*.map.json
+*.keystore
+*.jks
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Logs and temporary files
+*.log
+*.bak
+*.swp
+*~
+
+# Node.js (report.js dependencies)
+node_modules/
+package-lock.json

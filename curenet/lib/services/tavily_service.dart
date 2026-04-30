@@ -33,14 +33,14 @@ class TavilyService {
         // Otherwise fallback to combining the search snippets
         final results = data['results'] as List<dynamic>?;
         if (results != null && results.isNotEmpty) {
-          final snippets = results.map((e) => e['content']).join('\\n\\n');
-          return "Web Search Context:\\n\$snippets";
+          final snippets = results.map((e) => e['content']).join('\n\n');
+          return "Web Search Context:\n$snippets";
         }
       } else {
-        debugPrint('Tavily Error: \${response.statusCode} - \${response.body}');
+        debugPrint('Tavily Error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint('Tavily Exception: \$e');
+      debugPrint('Tavily Exception: $e');
     }
     return null;
   }

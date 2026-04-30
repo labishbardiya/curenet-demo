@@ -34,7 +34,7 @@ class BhashiniTtsService {
     String? language,
     String voiceName = 'Female1',
     String voiceStyle = 'Neutral',
-    double speechRate = 0.9,
+    double speechRate = 0.3,
   }) async {
     final apiKey = AppConfig.bhashiniApiKey;
     if (apiKey.isEmpty) return false;

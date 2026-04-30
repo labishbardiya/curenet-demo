@@ -7,7 +7,7 @@ class RegisterAbhaScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const String abhaAddress = 'labish123@abdm'; // Mock from API
+    const String abhaAddress = 'labish123@abdm';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),

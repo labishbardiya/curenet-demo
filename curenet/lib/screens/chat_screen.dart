@@ -141,6 +141,27 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<String> _getPatientContext() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? recordsJson = prefs.getString('health_records');
+    final String? abhaAddress = prefs.getString('abha_address') ?? 'Not provided';
+    final String? userName = prefs.getString('user_name') ?? 'Priya Sharma'; // Fallback to Priya for demo
+
+    String context = "[PATIENT_PROFILE]\nName: $userName\nABHA: $abhaAddress\n\n[MEDICAL_RECORDS]\n";
+    
+    if (recordsJson != null && recordsJson.isNotEmpty) {
+      final List<dynamic> records = jsonDecode(recordsJson);
+      for (var r in records) {
+        context += "- ${r['date']}: ${r['title']} (Doctor: ${r['doctor']}, Category: ${r['category']})\n";
+      }
+    } else {
+      context += "No local records found.";
+    }
+    
+    context += "\n[/MEDICAL_RECORDS]";
+    return context;
+  }
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -154,7 +175,12 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     final languageCode = AppLanguage.selectedLanguage.value;
-    final reply = await AiService.sendMessage(text, language: languageCode);
+    final patientContext = await _getPatientContext();
+    final reply = await AiService.sendMessage(
+      text, 
+      language: languageCode, 
+      patientContext: patientContext,
+    );
     
     if (!mounted) return;
     setState(() {
@@ -167,11 +193,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -184,7 +212,12 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     final languageCode = AppLanguage.selectedLanguage.value;
-    final reply = await AiService.sendMessage(question, language: languageCode);
+    final patientContext = await _getPatientContext();
+    final reply = await AiService.sendMessage(
+      question, 
+      language: languageCode,
+      patientContext: patientContext,
+    );
     
     if (!mounted) return;
     setState(() {
@@ -394,24 +427,25 @@ Widget build(BuildContext context) {
           ),
         ),
 
-          // Starter Questions (unchanged)
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Color(0xFFD8DDE6))),
+          // Starter Questions (Hide after first interaction)
+          if (_messages.length <= 1)
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Color(0xFFD8DDE6))),
+              ),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _starterChip("Emergency Snapshot"),
+                  _starterChip("Simplify my latest lab report"),
+                  _starterChip("Any side effects with my medicines?"),
+                  _starterChip("Summarize my last doctor's visit"),
+                ],
+              ),
             ),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _starterChip("Emergency Snapshot"),
-                _starterChip("Simplify my latest lab report"),
-                _starterChip("Any side effects with my medicines?"),
-                _starterChip("Summarize my last doctor's visit"),
-              ],
-            ),
-          ),
 
           // Input Bar (unchanged)
           Container(
