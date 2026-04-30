@@ -1,0 +1,35 @@
+# Root .gitignore for CureNet
+
+# Project specific docs to ignore
+COMPLETE_PROJECT_CONTEXT.md
+MIDTERM_REPORT.md
+.DS_Store
+
+# Nested project ignores
+curenet/.env
+curenet/PRESENTATION_NOTES.md
+curenet/AI_chat.txt
+
+# General Flutter/Dart ignores (Recursive)
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Mobile specific
+/android/app/debug
+/android/app/profile
+/android/app/release
+app.*.symbols
+app.*.map.json

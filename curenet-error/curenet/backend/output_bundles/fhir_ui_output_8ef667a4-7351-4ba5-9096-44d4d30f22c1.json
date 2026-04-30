@@ -1,0 +1,228 @@
+{
+  "fhir_bundle": {
+    "resourceType": "Bundle",
+    "id": "c91af16d-b2d9-4529-8552-375c272255e0",
+    "meta": {
+      "lastUpdated": "2026-04-28T20:07:29.304Z",
+      "profile": [
+        "https://nrces.in/ndhm/fhir/r4/StructureDefinition/DocumentBundle"
+      ]
+    },
+    "identifier": {
+      "system": "https://curenet.abdm.gov.in",
+      "value": "c91af16d-b2d9-4529-8552-375c272255e0"
+    },
+    "type": "document",
+    "timestamp": "2026-04-28T20:07:29.304Z",
+    "entry": [
+      {
+        "fullUrl": "urn:uuid:0d548130-2351-4c1d-b78a-87c5f6a43a0f",
+        "resource": {
+          "resourceType": "Composition",
+          "id": "0d548130-2351-4c1d-b78a-87c5f6a43a0f",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/PrescriptionRecord"
+            ]
+          },
+          "status": "final",
+          "type": {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "440545006",
+                "display": "Prescription record"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:021cd790-d58f-4d81-8d86-4e3ad14a52b1"
+          },
+          "encounter": {
+            "reference": "urn:uuid:e23a446d-abf2-4588-97a1-7ca90b815d93"
+          },
+          "date": "2026-04-28",
+          "author": [
+            {
+              "reference": "urn:uuid:27ee2153-05eb-4a89-86b8-42c1eff8a0f8"
+            }
+          ],
+          "title": "Prescription Record",
+          "section": [
+            {
+              "title": "Prescription",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "440545006",
+                    "display": "Prescription record"
+                  }
+                ]
+              },
+              "entry": [
+                {
+                  "reference": "urn:uuid:f825d48e-7cf2-4d48-b06a-3082782f20a7"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:021cd790-d58f-4d81-8d86-4e3ad14a52b1",
+        "resource": {
+          "resourceType": "Patient",
+          "id": "021cd790-d58f-4d81-8d86-4e3ad14a52b1",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Patient"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://healthid.abdm.gov.in",
+              "value": "unknown",
+              "type": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                    "code": "MR",
+                    "display": "Medical record number"
+                  }
+                ]
+              }
+            }
+          ],
+          "name": [
+            {
+              "text": "unclear",
+              "use": "official"
+            }
+          ],
+          "gender": "unknown"
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:27ee2153-05eb-4a89-86b8-42c1eff8a0f8",
+        "resource": {
+          "resourceType": "Practitioner",
+          "id": "27ee2153-05eb-4a89-86b8-42c1eff8a0f8",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Practitioner"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://doctor.ndhm.gov.in",
+              "value": "unknown"
+            }
+          ],
+          "name": [
+            {
+              "text": "unclear",
+              "use": "official"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:e23a446d-abf2-4588-97a1-7ca90b815d93",
+        "resource": {
+          "resourceType": "Encounter",
+          "id": "e23a446d-abf2-4588-97a1-7ca90b815d93",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Encounter"
+            ]
+          },
+          "status": "finished",
+          "class": {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+            "code": "AMB",
+            "display": "ambulatory"
+          },
+          "subject": {
+            "reference": "urn:uuid:021cd790-d58f-4d81-8d86-4e3ad14a52b1"
+          },
+          "period": {
+            "start": "2026-04-28"
+          }
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:f825d48e-7cf2-4d48-b06a-3082782f20a7",
+        "resource": {
+          "resourceType": "MedicationRequest",
+          "id": "f825d48e-7cf2-4d48-b06a-3082782f20a7",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/MedicationRequest"
+            ]
+          },
+          "status": "active",
+          "intent": "order",
+          "medicationCodeableConcept": {
+            "text": "softwa Telegra X Gamm PDF As 4 ७३ ७माद ऐग. अगनान पाटननोन ()#489-{60? ८५  p5l >*7/^7370*3 091<18) २ब५८२३२ ४न } ररीष mअ , (anr%+ ४४. %च| ऋi=ण२a \" \"06\" +117157|7147 Ipil 0\"1 13371131,738%1*7,01!:33 १२१ १४६९dा, स् सफन मिनिढा रमनगारफ पाईट्गखिस मार्षँग ([ )77117,7%1 4#7%1(79 7777 44^+7-7331<>' पनिमाम !७६ रगाकछ४ प३ नडिएश्म dप्राइगमि AiX५( HesroL",
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "763158003",
+                "display": "softwa Telegra X Gamm PDF As 4 ७३ ७माद ऐग. अगनान पाटननोन ()#489-{60? ८५  p5l >*7/^7370*3 091<18) २ब५८२३२ ४न } ररीष mअ , (anr%+ ४४. %च| ऋi=ण२a \" \"06\" +117157|7147 Ipil 0\"1 13371131,738%1*7,01!:33 १२१ १४६९dा, स् सफन मिनिढा रमनगारफ पाईट्गखिस मार्षँग ([ )77117,7%1 4#7%1(79 7777 44^+7-7331<>' पनिमाम !७६ रगाकछ४ प३ नडिएश्म dप्राइगमि AiX५( HesroL"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:021cd790-d58f-4d81-8d86-4e3ad14a52b1"
+          },
+          "authoredOn": "2026-04-28",
+          "requester": {
+            "reference": "urn:uuid:27ee2153-05eb-4a89-86b8-42c1eff8a0f8"
+          },
+          "encounter": {
+            "reference": "urn:uuid:e23a446d-abf2-4588-97a1-7ca90b815d93"
+          },
+          "dosageInstruction": [
+            {
+              "text": "OD",
+              "route": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "26643006",
+                    "display": "Oral route"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "ui_data": {
+    "document_type": "prescription",
+    "summary": {
+      "date": "2026-04-28",
+      "doctor": "unclear",
+      "facility": null,
+      "patient": "unclear"
+    },
+    "medications": [
+      {
+        "name": "softwa Telegra X Gamm PDF As 4 ७३ ७माद ऐग. अगनान पाटननोन ()#489-{60? ८५  p5l >*7/^7370*3 091<18) २ब५८२३२ ४न } ररीष mअ , (anr%+ ४४. %च| ऋi=ण२a \" \"06\" +117157|7147 Ipil 0\"1 13371131,738%1*7,01!:33 १२१ १४६९dा, स् सफन मिनिढा रमनगारफ पाईट्गखिस मार्षँग ([ )77117,7%1 4#7%1(79 7777 44^+7-7331<>' पनिमाम !७६ रगाकछ४ प३ नडिएश्म dप्राइगमि AiX५( HesroL",
+        "dosage": "unclear",
+        "frequency": "OD",
+        "duration": "unclear"
+      }
+    ],
+    "lab_results": [],
+    "documents": [
+      {
+        "type": "prescription",
+        "date": "2026-04-28"
+      }
+    ]
+  }
+}
