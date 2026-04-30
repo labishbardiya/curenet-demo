@@ -126,7 +126,21 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       if (available) {
         setState(() => _isListening = true);
+
+        // Map app languages to STT locales for Indian languages
+        String currentLang = AppLanguage.selectedLanguage.value;
+        String localeId = 'en_US';
+        if (currentLang == 'Hindi') localeId = 'hi_IN';
+        else if (currentLang == 'Bengali') localeId = 'bn_IN';
+        else if (currentLang == 'Telugu') localeId = 'te_IN';
+        else if (currentLang == 'Marathi') localeId = 'mr_IN';
+        else if (currentLang == 'Tamil') localeId = 'ta_IN';
+        else if (currentLang == 'Gujarati') localeId = 'gu_IN';
+        else if (currentLang == 'Kannada') localeId = 'kn_IN';
+        else if (currentLang == 'Malayalam') localeId = 'ml_IN';
+
         _speech.listen(
+          localeId: localeId,
           onResult: (val) => setState(() {
             _controller.text = val.recognizedWords;
           }),

@@ -1,0 +1,419 @@
+{
+  "fhir_bundle": {
+    "resourceType": "Bundle",
+    "id": "23cf0e09-2a59-4e5d-b0c8-2a706282eb83",
+    "meta": {
+      "lastUpdated": "2026-04-30T07:31:57.378Z",
+      "profile": [
+        "https://nrces.in/ndhm/fhir/r4/StructureDefinition/DocumentBundle"
+      ]
+    },
+    "identifier": {
+      "system": "https://curenet.abdm.gov.in",
+      "value": "23cf0e09-2a59-4e5d-b0c8-2a706282eb83"
+    },
+    "type": "document",
+    "timestamp": "2026-04-30T07:31:57.378Z",
+    "entry": [
+      {
+        "fullUrl": "urn:uuid:9377e70d-df29-40aa-a604-f06b26e3ced1",
+        "resource": {
+          "resourceType": "Composition",
+          "id": "9377e70d-df29-40aa-a604-f06b26e3ced1",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/PrescriptionRecord"
+            ]
+          },
+          "status": "final",
+          "type": {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "440545006",
+                "display": "Prescription record"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:61b4fee1-0e84-4163-b407-9de7b275d5b4"
+          },
+          "encounter": {
+            "reference": "urn:uuid:9145b0a8-90fb-46a4-90e5-73c5463c195a"
+          },
+          "date": "2024-05-12",
+          "author": [
+            {
+              "reference": "urn:uuid:bd8e4ec9-0378-4ba7-9720-b745a0f174bf"
+            }
+          ],
+          "title": "Prescription Record",
+          "section": [
+            {
+              "title": "Chief Complaint",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "422843007",
+                    "display": "Chief complaint section"
+                  }
+                ]
+              },
+              "text": {
+                "status": "generated",
+                "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Hypoglycemia</div>"
+              }
+            },
+            {
+              "title": "Vitals",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "1184593002",
+                    "display": "Vital signs section"
+                  }
+                ]
+              },
+              "entry": [
+                {
+                  "reference": "urn:uuid:97b77442-32f5-46ba-a3c8-8eb1f2b82914"
+                },
+                {
+                  "reference": "urn:uuid:976ac493-14db-47d3-83fd-fe794fc8061f"
+                }
+              ]
+            },
+            {
+              "title": "Prescription",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "440545006",
+                    "display": "Prescription record"
+                  }
+                ]
+              },
+              "entry": [
+                {
+                  "reference": "urn:uuid:10cebc42-58c5-4692-8503-d34245c8adeb"
+                },
+                {
+                  "reference": "urn:uuid:4df7dd20-78a4-42d9-839d-79275b0db0a1"
+                }
+              ]
+            },
+            {
+              "title": "Investigations Advised",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "721981007",
+                    "display": "Diagnostic studies report"
+                  }
+                ]
+              },
+              "text": {
+                "status": "generated",
+                "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">RBS: 50 mg/dL</div>"
+              }
+            },
+            {
+              "title": "Follow-up",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "390906007",
+                    "display": "Follow-up encounter"
+                  }
+                ]
+              },
+              "text": {
+                "status": "generated",
+                "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Date: TBD. Advice: </div>"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:61b4fee1-0e84-4163-b407-9de7b275d5b4",
+        "resource": {
+          "resourceType": "Patient",
+          "id": "61b4fee1-0e84-4163-b407-9de7b275d5b4",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Patient"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://healthid.abdm.gov.in",
+              "value": "unknown",
+              "type": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                    "code": "MR",
+                    "display": "Medical record number"
+                  }
+                ]
+              }
+            }
+          ],
+          "name": [
+            {
+              "text": "Priya Sharma",
+              "use": "official"
+            }
+          ],
+          "gender": "unknown"
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:bd8e4ec9-0378-4ba7-9720-b745a0f174bf",
+        "resource": {
+          "resourceType": "Practitioner",
+          "id": "bd8e4ec9-0378-4ba7-9720-b745a0f174bf",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Practitioner"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://doctor.ndhm.gov.in",
+              "value": "unknown"
+            }
+          ],
+          "name": [
+            {
+              "text": "Dr. Aarav Patel",
+              "use": "official"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:9145b0a8-90fb-46a4-90e5-73c5463c195a",
+        "resource": {
+          "resourceType": "Encounter",
+          "id": "9145b0a8-90fb-46a4-90e5-73c5463c195a",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Encounter"
+            ]
+          },
+          "status": "finished",
+          "class": {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+            "code": "AMB",
+            "display": "ambulatory"
+          },
+          "subject": {
+            "reference": "urn:uuid:61b4fee1-0e84-4163-b407-9de7b275d5b4"
+          },
+          "period": {
+            "start": "2024-05-12"
+          }
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:10cebc42-58c5-4692-8503-d34245c8adeb",
+        "resource": {
+          "resourceType": "MedicationRequest",
+          "id": "10cebc42-58c5-4692-8503-d34245c8adeb",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/MedicationRequest"
+            ]
+          },
+          "status": "active",
+          "intent": "order",
+          "medicationCodeableConcept": {
+            "text": "5% Dextrose",
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "763158003",
+                "display": "5% Dextrose"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:61b4fee1-0e84-4163-b407-9de7b275d5b4"
+          },
+          "authoredOn": "2024-05-12",
+          "requester": {
+            "reference": "urn:uuid:bd8e4ec9-0378-4ba7-9720-b745a0f174bf"
+          },
+          "encounter": {
+            "reference": "urn:uuid:9145b0a8-90fb-46a4-90e5-73c5463c195a"
+          },
+          "dosageInstruction": [
+            {
+              "text": "IV Stat — for Immediate",
+              "route": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "26643006",
+                    "display": "Oral route"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:4df7dd20-78a4-42d9-839d-79275b0db0a1",
+        "resource": {
+          "resourceType": "MedicationRequest",
+          "id": "4df7dd20-78a4-42d9-839d-79275b0db0a1",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/MedicationRequest"
+            ]
+          },
+          "status": "active",
+          "intent": "order",
+          "medicationCodeableConcept": {
+            "text": "ORS",
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "763158003",
+                "display": "ORS"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:61b4fee1-0e84-4163-b407-9de7b275d5b4"
+          },
+          "authoredOn": "2024-05-12",
+          "requester": {
+            "reference": "urn:uuid:bd8e4ec9-0378-4ba7-9720-b745a0f174bf"
+          },
+          "encounter": {
+            "reference": "urn:uuid:9145b0a8-90fb-46a4-90e5-73c5463c195a"
+          },
+          "dosageInstruction": [
+            {
+              "text": "2 Sachets — for As needed",
+              "route": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "26643006",
+                    "display": "Oral route"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:97b77442-32f5-46ba-a3c8-8eb1f2b82914",
+        "resource": {
+          "resourceType": "Observation",
+          "id": "97b77442-32f5-46ba-a3c8-8eb1f2b82914",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Observation"
+            ]
+          },
+          "status": "final",
+          "code": {
+            "coding": [
+              {
+                "system": "http://loinc.org",
+                "code": "85354-9",
+                "display": "Blood pressure panel"
+              }
+            ],
+            "text": "Blood pressure panel"
+          },
+          "subject": {
+            "reference": "urn:uuid:61b4fee1-0e84-4163-b407-9de7b275d5b4"
+          },
+          "effectiveDateTime": "2024-05-12",
+          "valueString": "110/70"
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:976ac493-14db-47d3-83fd-fe794fc8061f",
+        "resource": {
+          "resourceType": "Observation",
+          "id": "976ac493-14db-47d3-83fd-fe794fc8061f",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Observation"
+            ]
+          },
+          "status": "final",
+          "code": {
+            "coding": [
+              {
+                "system": "http://loinc.org",
+                "code": "8867-4",
+                "display": "Heart rate"
+              }
+            ],
+            "text": "Heart rate"
+          },
+          "subject": {
+            "reference": "urn:uuid:61b4fee1-0e84-4163-b407-9de7b275d5b4"
+          },
+          "effectiveDateTime": "2024-05-12",
+          "valueString": "60 bpm"
+        }
+      }
+    ]
+  },
+  "ui_data": {
+    "document_type": "prescription",
+    "summary": {
+      "date": "2024-05-12",
+      "doctor": "Dr. Aarav Patel",
+      "facility": null,
+      "patient": "Priya Sharma",
+      "chief_complaint": "Hypoglycemia",
+      "vitals": {
+        "bp": "110/70",
+        "pulse": "60 bpm"
+      },
+      "investigations": "RBS: 50 mg/dL"
+    },
+    "medications": [
+      {
+        "name": "5% Dextrose",
+        "dosage": "IV Stat",
+        "frequency": "",
+        "duration": "Immediate"
+      },
+      {
+        "name": "ORS",
+        "dosage": "2 Sachets",
+        "frequency": "",
+        "duration": "As needed"
+      }
+    ],
+    "lab_results": [],
+    "documents": [
+      {
+        "type": "prescription",
+        "date": "2024-05-12"
+      }
+    ],
+    "follow_up": {
+      "date": null,
+      "advice": []
+    }
+  }
+}

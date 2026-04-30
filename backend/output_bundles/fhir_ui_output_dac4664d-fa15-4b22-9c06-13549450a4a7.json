@@ -1,0 +1,397 @@
+{
+  "fhir_bundle": {
+    "resourceType": "Bundle",
+    "id": "c61a9861-055d-4984-adda-1f672d212b03",
+    "meta": {
+      "lastUpdated": "2026-04-30T03:48:09.133Z",
+      "profile": [
+        "https://nrces.in/ndhm/fhir/r4/StructureDefinition/DocumentBundle"
+      ]
+    },
+    "identifier": {
+      "system": "https://curenet.abdm.gov.in",
+      "value": "c61a9861-055d-4984-adda-1f672d212b03"
+    },
+    "type": "document",
+    "timestamp": "2026-04-30T03:48:09.133Z",
+    "entry": [
+      {
+        "fullUrl": "urn:uuid:20936a07-4944-4108-a5cb-dc8540e404e6",
+        "resource": {
+          "resourceType": "Composition",
+          "id": "20936a07-4944-4108-a5cb-dc8540e404e6",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/PrescriptionRecord"
+            ]
+          },
+          "status": "final",
+          "type": {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "440545006",
+                "display": "Prescription record"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:df204e2a-eb71-48ee-a787-b65a30024a72"
+          },
+          "encounter": {
+            "reference": "urn:uuid:00546900-5919-4386-a61b-bfbb88b13c91"
+          },
+          "date": "2022-12-22",
+          "author": [
+            {
+              "reference": "urn:uuid:26f7b7e7-b33c-4ac8-8f19-af5fcba11fda"
+            }
+          ],
+          "title": "Prescription Record",
+          "section": [
+            {
+              "title": "Diagnosis",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "439401001",
+                    "display": "Diagnosis section"
+                  }
+                ]
+              },
+              "text": {
+                "status": "generated",
+                "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">unclear</div>"
+              }
+            },
+            {
+              "title": "Chief Complaint",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "422843007",
+                    "display": "Chief complaint section"
+                  }
+                ]
+              },
+              "text": {
+                "status": "generated",
+                "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Giddiness, restlessness</div>"
+              }
+            },
+            {
+              "title": "Vitals",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "1184593002",
+                    "display": "Vital signs section"
+                  }
+                ]
+              },
+              "entry": [
+                {
+                  "reference": "urn:uuid:1e8887e1-e5d3-4dd4-8879-a9e753911aa6"
+                },
+                {
+                  "reference": "urn:uuid:915124ca-c3b7-4930-b2d0-efaa7537146f"
+                }
+              ]
+            },
+            {
+              "title": "Prescription",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "440545006",
+                    "display": "Prescription record"
+                  }
+                ]
+              },
+              "entry": [
+                {
+                  "reference": "urn:uuid:656c969d-d65e-48f5-bc34-334bb4f3a76f"
+                }
+              ]
+            },
+            {
+              "title": "Investigations Advised",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "721981007",
+                    "display": "Diagnostic studies report"
+                  }
+                ]
+              },
+              "text": {
+                "status": "generated",
+                "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">unclear</div>"
+              }
+            },
+            {
+              "title": "Follow-up",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "390906007",
+                    "display": "Follow-up encounter"
+                  }
+                ]
+              },
+              "text": {
+                "status": "generated",
+                "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Date: TBD. Advice: Adequate fluid intake, ORS 2 sachets</div>"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:df204e2a-eb71-48ee-a787-b65a30024a72",
+        "resource": {
+          "resourceType": "Patient",
+          "id": "df204e2a-eb71-48ee-a787-b65a30024a72",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Patient"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://healthid.abdm.gov.in",
+              "value": "unknown",
+              "type": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                    "code": "MR",
+                    "display": "Medical record number"
+                  }
+                ]
+              }
+            }
+          ],
+          "name": [
+            {
+              "text": "Vivek S",
+              "use": "official"
+            }
+          ],
+          "gender": "unknown",
+          "extension": [
+            {
+              "url": "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Age",
+              "valueString": "19M"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:26f7b7e7-b33c-4ac8-8f19-af5fcba11fda",
+        "resource": {
+          "resourceType": "Practitioner",
+          "id": "26f7b7e7-b33c-4ac8-8f19-af5fcba11fda",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Practitioner"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://doctor.ndhm.gov.in",
+              "value": "unknown"
+            }
+          ],
+          "name": [
+            {
+              "text": "unclear",
+              "use": "official"
+            }
+          ],
+          "qualification": [
+            {
+              "code": {
+                "text": "Adichunchanagiri Institute of Medical Sciences Hospital & Research Centre"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:00546900-5919-4386-a61b-bfbb88b13c91",
+        "resource": {
+          "resourceType": "Encounter",
+          "id": "00546900-5919-4386-a61b-bfbb88b13c91",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Encounter"
+            ]
+          },
+          "status": "finished",
+          "class": {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+            "code": "AMB",
+            "display": "ambulatory"
+          },
+          "subject": {
+            "reference": "urn:uuid:df204e2a-eb71-48ee-a787-b65a30024a72"
+          },
+          "period": {
+            "start": "2022-12-22"
+          }
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:656c969d-d65e-48f5-bc34-334bb4f3a76f",
+        "resource": {
+          "resourceType": "MedicationRequest",
+          "id": "656c969d-d65e-48f5-bc34-334bb4f3a76f",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/MedicationRequest"
+            ]
+          },
+          "status": "active",
+          "intent": "order",
+          "medicationCodeableConcept": {
+            "text": "5% Dextrose",
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "763158003",
+                "display": "5% Dextrose (Injection)"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:df204e2a-eb71-48ee-a787-b65a30024a72"
+          },
+          "authoredOn": "2022-12-22",
+          "requester": {
+            "reference": "urn:uuid:26f7b7e7-b33c-4ac8-8f19-af5fcba11fda"
+          },
+          "encounter": {
+            "reference": "urn:uuid:00546900-5919-4386-a61b-bfbb88b13c91"
+          },
+          "dosageInstruction": [
+            {
+              "text": "Injection — 1 unit — Stat — (iv)",
+              "route": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "26643006",
+                    "display": "Oral route"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:1e8887e1-e5d3-4dd4-8879-a9e753911aa6",
+        "resource": {
+          "resourceType": "Observation",
+          "id": "1e8887e1-e5d3-4dd4-8879-a9e753911aa6",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Observation"
+            ]
+          },
+          "status": "final",
+          "code": {
+            "coding": [
+              {
+                "system": "http://loinc.org",
+                "code": "85354-9",
+                "display": "Blood pressure panel"
+              }
+            ],
+            "text": "Blood pressure panel"
+          },
+          "subject": {
+            "reference": "urn:uuid:df204e2a-eb71-48ee-a787-b65a30024a72"
+          },
+          "effectiveDateTime": "2022-12-22",
+          "valueString": "110/70"
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:915124ca-c3b7-4930-b2d0-efaa7537146f",
+        "resource": {
+          "resourceType": "Observation",
+          "id": "915124ca-c3b7-4930-b2d0-efaa7537146f",
+          "meta": {
+            "profile": [
+              "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Observation"
+            ]
+          },
+          "status": "final",
+          "code": {
+            "coding": [
+              {
+                "system": "http://loinc.org",
+                "code": "8867-4",
+                "display": "Heart rate"
+              }
+            ],
+            "text": "Heart rate"
+          },
+          "subject": {
+            "reference": "urn:uuid:df204e2a-eb71-48ee-a787-b65a30024a72"
+          },
+          "effectiveDateTime": "2022-12-22",
+          "valueString": "60bpm"
+        }
+      }
+    ]
+  },
+  "ui_data": {
+    "document_type": "prescription",
+    "summary": {
+      "date": "2022-12-22",
+      "doctor": "unclear",
+      "facility": "Adichunchanagiri Institute of Medical Sciences Hospital & Research Centre",
+      "patient": "Vivek S",
+      "diagnosis": "unclear",
+      "chief_complaint": "Giddiness, restlessness",
+      "vitals": {
+        "bp": "110/70",
+        "pulse": "60bpm",
+        "temperature": null,
+        "weight": null
+      },
+      "investigations": "unclear"
+    },
+    "medications": [
+      {
+        "name": "5% Dextrose",
+        "dosage": "1 unit",
+        "frequency": "Stat",
+        "duration": "unclear"
+      }
+    ],
+    "lab_results": [],
+    "documents": [
+      {
+        "type": "prescription",
+        "date": "2022-12-22"
+      }
+    ],
+    "follow_up": {
+      "date": null,
+      "advice": [
+        "Adequate fluid intake",
+        "ORS 2 sachets"
+      ]
+    }
+  }
+}
