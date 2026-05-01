@@ -305,44 +305,47 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
                                 ? Image.network(_pickedFile!.path, fit: BoxFit.cover)
                                 : Image.file(File(_pickedFile!.path), fit: BoxFit.cover),
                           )
-                        : Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Positioned(top: 12, left: 12, child: _cornerBracket()),
-                              Positioned(top: 12, right: 12, child: _cornerBracket(rotate: true)),
-                              Positioned(bottom: 12, left: 12, child: _cornerBracket(rotate: true, bottom: true)),
-                              Positioned(bottom: 12, right: 12, child: _cornerBracket(bottom: true)),
-
-                              AnimatedBuilder(
-                                animation: _scanAnimation,
-                                builder: (context, child) {
-                                  return Positioned(
-                                    top: _scanAnimation.value * 220 + 20,
-                                    left: 20,
-                                    right: 20,
-                                    child: Container(
-                                      height: 2,
-                                      decoration: const BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [Colors.transparent, Color(0xFF00A3A3), Colors.transparent],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-
-                              const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                        : GestureDetector(
+                            onTap: _handleCameraScan,
+                            child: Stack(
+                                alignment: Alignment.center,
                                 children: [
-                                  Icon(Icons.camera_enhance, size: 48, color: Colors.white54),
-                                  SizedBox(height: 8),
-                                  TranslatedText("Camera Ready",
-                                    style: TextStyle(fontSize: 13, color: Color(0xFF9BA8BB)),
+                                  Positioned(top: 12, left: 12, child: _cornerBracket()),
+                                  Positioned(top: 12, right: 12, child: _cornerBracket(rotate: true)),
+                                  Positioned(bottom: 12, left: 12, child: _cornerBracket(rotate: true, bottom: true)),
+                                  Positioned(bottom: 12, right: 12, child: _cornerBracket(bottom: true)),
+
+                                  AnimatedBuilder(
+                                    animation: _scanAnimation,
+                                    builder: (context, child) {
+                                      return Positioned(
+                                        top: _scanAnimation.value * 220 + 20,
+                                        left: 20,
+                                        right: 20,
+                                        child: Container(
+                                          height: 2,
+                                          decoration: const BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [Colors.transparent, Color(0xFF00A3A3), Colors.transparent],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+
+                                  const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.camera_enhance, size: 48, color: Colors.white54),
+                                      SizedBox(height: 8),
+                                      TranslatedText("Camera Ready",
+                                        style: TextStyle(fontSize: 13, color: Color(0xFF9BA8BB)),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
                           ),
                   ),
 

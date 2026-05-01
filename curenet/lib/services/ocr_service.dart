@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import '../core/app_config.dart';
+import '../core/data_mode.dart';
 
 class OcrService {
   static const String _storageKey = 'curenet_saved_records';
@@ -26,6 +29,7 @@ class OcrService {
         'uiData': uiData,
         'fhirBundle': recordData['fhirBundle'],
         'abdmContext': abdmContext,
+        'imagePath': recordData['imagePath'],
         // Searchable/display metadata
         'title': _generateTitle(uiData, abdmContext),
         'doctor': summary['doctor'] ?? abdmContext['doctorName'] ?? 'Unknown',
@@ -246,6 +250,32 @@ class OcrService {
       await prefs.setString('health_records', jsonEncode(healthRecords));
     } catch (e) {
       print('Error syncing to health_records: $e');
+    }
+  }
+
+  /// Retrieve all saved records from the backend MongoDB (Production DB)
+  static Future<List<Map<String, dynamic>>> getBackendRecords() async {
+    try {
+      final response = await http.get(Uri.parse('${AppConfig.ocrApiUrl.replaceAll('/ocr', '')}/records/all'))
+          .timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['data']);
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching backend records: $e');
+      return [];
+    }
+  }
+
+  /// Get unified records based on DataMode
+  static Future<List<Map<String, dynamic>>> getUnifiedRecords() async {
+    if (DataMode.isDemo.value) {
+      return getLocalRecords();
+    } else {
+      return getBackendRecords();
     }
   }
 }

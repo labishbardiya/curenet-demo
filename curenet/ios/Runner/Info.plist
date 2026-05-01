@@ -72,5 +72,7 @@
 	<string>CureNet needs access to your photo library to upload saved medical reports.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>CureNet needs access to your microphone for voice health assistants.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>CureNet uses FaceID to secure your Health Locker records.</string>
 </dict>
 </plist>

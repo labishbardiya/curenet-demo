@@ -11,7 +11,6 @@ const RecordSchema = new mongoose.Schema({
         enum: ['pending', 'processing', 'completed', 'failed'],
         default: 'pending'
     },
-    // The ABDM referenceNumber. Fully available once processing is successfully completed.
     recordId: {
         type: String
     },
@@ -24,7 +23,6 @@ const RecordSchema = new mongoose.Schema({
     confidence_score: {
         type: Number
     },
-    // Required fields to map seamlessly to an ABDM CareContext payload later
     abdmContext: {
         isReadyForLink: { type: Boolean, default: false },
         hiType: { type: String, default: 'DiagnosticReport' }, 
@@ -34,48 +32,14 @@ const RecordSchema = new mongoose.Schema({
         type: String
     }],
     filePath: {
-        type: String // Storing local file path if we need to retrieve it during background processing
+        type: String
     },
     fhirBundle: {
-        type: Object // Will store the fully compliant ABDM FHIR Bundle JSON
+        type: Object
     },
     uiData: {
-        type: Object // UI-optimized structured output { document_type, summary, medications, lab_results, documents }
+        type: Object
     }
 }, { timestamps: true });
 
-// module.exports = mongoose.model('Record', RecordSchema);
-
-const memoryDb = [];
-
-class MockRecord {
-    constructor(data) {
-        Object.assign(this, data);
-        if (!this.status) this.status = 'pending';
-    }
-
-    async save() {
-        const existingIdx = memoryDb.findIndex(r => r.jobId === this.jobId);
-        if (existingIdx >= 0) {
-            memoryDb[existingIdx] = this;
-        } else {
-            memoryDb.push(this);
-        }
-        return this;
-    }
-
-    static async findOne(query) {
-        return memoryDb.find(r => Object.keys(query).every(k => r[k] === query[k])) || null;
-    }
-
-    static async findOneAndUpdate(query, update, options) {
-        let doc = memoryDb.find(r => Object.keys(query).every(k => r[k] === query[k]));
-        if (doc) {
-            Object.assign(doc, update);
-            return doc;
-        }
-        return null;
-    }
-}
-
-module.exports = MockRecord;
+module.exports = mongoose.model('Record', RecordSchema);
