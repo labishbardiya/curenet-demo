@@ -18,10 +18,30 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
   List<Map<String, dynamic>> _lockerRecords = [];
   bool _isLoading = true;
 
+  bool _isAuthenticated = false;
+
   @override
   void initState() {
     super.initState();
-    _loadLockerRecords();
+    _authenticateLocker();
+  }
+
+  Future<void> _authenticateLocker() async {
+    final canBio = await BiometricService.canAuthenticate();
+    if (canBio) {
+      final success = await BiometricService.authenticate(
+        reason: "Authenticate to access Health Locker",
+      );
+      if (success) {
+        if (mounted) setState(() => _isAuthenticated = true);
+        _loadLockerRecords();
+      } else {
+        if (mounted) Navigator.pop(context);
+      }
+    } else {
+      if (mounted) setState(() => _isAuthenticated = true);
+      _loadLockerRecords();
+    }
   }
 
 
@@ -32,15 +52,6 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
   }
 
   void _unlockAndView(Map<String, dynamic> record, String title) async {
-    // 1. Biometric check for EACH file
-    final canBio = await BiometricService.canAuthenticate();
-    if (canBio) {
-      final success = await BiometricService.authenticate(
-        reason: "Authenticate to view $title",
-      );
-      if (!success) return; // User cancelled or failed
-    }
-
     // 2. Open the rendered FHIR view if we have full data
     if (record['uiData'] != null && mounted) {
       Navigator.push(context, MaterialPageRoute(
@@ -197,11 +208,6 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
               ],
             )),
             Row(mainAxisSize: MainAxisSize.min, children: [
-              if (imagePath != null)
-                IconButton(
-                  icon: const Icon(Icons.image_outlined, color: Color(0xFF00A3A3), size: 22),
-                  onPressed: () => _showOriginalImage(imagePath),
-                ),
               const SizedBox(width: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -223,43 +229,6 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
     );
   }
 
-  void _showOriginalImage(String imagePath) async {
-    // Biometric check before viewing image in locker
-    final canBio = await BiometricService.canAuthenticate();
-    if (canBio) {
-      final success = await BiometricService.authenticate(
-        reason: "Authenticate to view document image",
-      );
-      if (!success) return;
-    }
-
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(10),
-        child: Stack(
-          alignment: Alignment.topRight,
-          children: [
-            InteractiveViewer(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: imagePath.startsWith('http') 
-                    ? Image.network(imagePath) 
-                    : Image.file(File(imagePath)),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.white, size: 30),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildActionCard({required IconData icon, required String title, required String subtitle, required Color color, required VoidCallback onTap}) {
     return GestureDetector(

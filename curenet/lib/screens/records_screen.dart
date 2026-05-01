@@ -360,8 +360,10 @@ class _RecordsScreenState extends State<RecordsScreen> {
                       itemBuilder: (context, index) {
                         final record = filteredRecords[index];
                         final originalIndex = allRecords.indexOf(record);
+                        // Use localId for real records, or hashCode for demo/unsaved records to guarantee uniqueness
+                        final uniqueKey = record['localId']?.toString() ?? record.hashCode.toString();
                         return Dismissible(
-                          key: Key('${record['title']}_${record['date']}_$index'),
+                          key: Key(uniqueKey),
                           direction: DismissDirection.endToStart,
                           background: Container(
                             alignment: Alignment.centerRight,
@@ -451,40 +453,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
                 Icon(hasData ? Icons.visibility : Icons.arrow_forward_ios,
                   size: 16, color: hasData ? const Color(0xFF00A3A3) : const Color(0xFF9BA8BB)),
               ],
-            ),
-            if (record['imagePath'] != null) ...[
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.image_outlined, color: Color(0xFF00A3A3), size: 22),
-                onPressed: () => _showOriginalImage(record['imagePath']),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showOriginalImage(String imagePath) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(10),
-        child: Stack(
-          alignment: Alignment.topRight,
-          children: [
-            InteractiveViewer(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: imagePath.startsWith('http') 
-                    ? Image.network(imagePath) 
-                    : Image.file(File(imagePath)),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.white, size: 30),
-              onPressed: () => Navigator.pop(context),
             ),
           ],
         ),

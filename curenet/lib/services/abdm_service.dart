@@ -212,7 +212,7 @@ class AbdmService {
   }) async {
     final uri = Uri.parse('$_abhaBase/v3/profile/login/request/otp');
     return _postWithAuth(uri, {
-      'scope': ['abha-login', 'openid', 'profile'],
+      'scope': ['abha-login', '$loginHint-verify'],
       'loginHint': loginHint,
       'loginId': encryptedAbhaIdOrMobile,
       'otpSystem': otpSystem,
@@ -223,10 +223,11 @@ class AbdmService {
   static Future<Map<String, dynamic>> verifyLoginOtp({
     required String txnId,
     required String encryptedOtp,
+    String loginHint = 'mobile',
   }) async {
     final uri = Uri.parse('$_abhaBase/v3/profile/login/verify');
     return _postWithAuth(uri, {
-      'scope': ['abha-login', 'openid', 'profile'],
+      'scope': ['abha-login', '$loginHint-verify'],
       'authData': {
         'authMethods': ['otp'],
         'otp': {'txnId': txnId, 'otpValue': encryptedOtp},
