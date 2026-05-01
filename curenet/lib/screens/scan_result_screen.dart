@@ -3,12 +3,16 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../core/translated_text.dart';
 import '../services/ocr_service.dart';
+import '../services/biometric_service.dart';
 
 class ScanResultScreen extends StatefulWidget {
   final Map<String, dynamic> uiData;
   final Map<String, dynamic> fhirBundle;
   final Map<String, dynamic> abdmContext;
   final String? imagePath;
+  final String? localId;
+  final bool isSaved;
+  final bool isFromLocker;
 
   const ScanResultScreen({
     super.key,
@@ -16,6 +20,9 @@ class ScanResultScreen extends StatefulWidget {
     required this.fhirBundle,
     required this.abdmContext,
     this.imagePath,
+    this.localId,
+    this.isSaved = false,
+    this.isFromLocker = false,
   });
 
   @override
@@ -32,9 +39,15 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _autoSaveRecord();
-    });
+    _hasSaved = widget.isSaved;
+    _savedToLocker = widget.isFromLocker;
+    _currentLocalId = widget.localId;
+
+    if (!widget.isSaved) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _autoSaveRecord();
+      });
+    }
   }
 
   void _autoSaveRecord() async {
@@ -88,6 +101,37 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
           ),
           backgroundColor: Color(0xFF6B4E9B),
           duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  void _removeFromLocker() async {
+    if (!_savedToLocker || _currentLocalId == null) return;
+    
+    // Authenticate before removal, with a 30-second grace period
+    final canBio = await BiometricService.canAuthenticate();
+    if (canBio) {
+      final success = await BiometricService.authenticate(
+        reason: "Verify identity to remove from Health Locker",
+        useGracePeriod: true,
+      );
+      if (!success) return;
+    }
+
+    setState(() => _isSaving = true);
+    
+    await OcrService.removeFromLocker(_currentLocalId!);
+    
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+        _savedToLocker = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Removed from Health Locker"),
+          backgroundColor: Color(0xFFD63B3B),
         ),
       );
     }
@@ -664,24 +708,24 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
       ),
       child: Row(
         children: [
-          // Save to Locker button
+          // Save/Remove from Locker button
           Expanded(
-            flex: 3,
+            flex: widget.isFromLocker ? 5 : 3,
             child: ElevatedButton.icon(
-              onPressed: _isSaving || _savedToLocker ? null : _saveToLocker,
+              onPressed: _isSaving ? null : (_savedToLocker ? _removeFromLocker : _saveToLocker),
               icon: Icon(
-                _savedToLocker ? Icons.lock : Icons.lock_outline,
+                _savedToLocker ? Icons.lock_open : Icons.lock_outline,
                 size: 18,
                 color: Colors.white,
               ),
               label: TranslatedText(
-                _savedToLocker ? "SAVED TO LOCKER ✓" : "SAVE TO LOCKER",
+                _savedToLocker ? "REMOVE FROM LOCKER" : "SAVE TO LOCKER",
                 style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 13),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _savedToLocker ? const Color(0xFF22A36A) : const Color(0xFF6B4E9B),
+                backgroundColor: _savedToLocker ? const Color(0xFFD63B3B) : const Color(0xFF6B4E9B),
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: const Color(0xFF22A36A),
+                disabledBackgroundColor: const Color(0xFFD63B3B).withOpacity(0.5),
                 disabledForegroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -689,26 +733,28 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          // Scan Another button
-          Expanded(
-            flex: 2,
-            child: ElevatedButton.icon(
-              onPressed: _scanAnother,
-              icon: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
-              label: const TranslatedText(
-                "SCAN",
-                style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 13),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0D2240),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 0,
+          if (!widget.isFromLocker) ...[
+            const SizedBox(width: 12),
+            // Scan Another button
+            Expanded(
+              flex: 2,
+              child: ElevatedButton.icon(
+                onPressed: _scanAnother,
+                icon: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                label: const TranslatedText(
+                  "SCAN",
+                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D2240),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 0,
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

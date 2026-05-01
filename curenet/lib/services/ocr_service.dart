@@ -79,6 +79,27 @@ class OcrService {
     }
   }
 
+  /// Remove a record from locker
+  static Future<void> removeFromLocker(String localId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      List<String> recordsList = prefs.getStringList(_storageKey) ?? [];
+      
+      for (int i = 0; i < recordsList.length; i++) {
+        final record = jsonDecode(recordsList[i]) as Map<String, dynamic>;
+        if (record['localId'] == localId) {
+          record['savedToLocker'] = false;
+          recordsList[i] = jsonEncode(record);
+          break;
+        }
+      }
+      
+      await prefs.setStringList(_storageKey, recordsList);
+    } catch (e) {
+      print('Error removing record from locker: $e');
+    }
+  }
+
   /// Retrieve all saved records (full data including uiData/fhirBundle)
   static Future<List<Map<String, dynamic>>> getLocalRecords() async {
     try {

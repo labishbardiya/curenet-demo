@@ -1,5 +1,5 @@
 /// ─── CureNet Demo Persona ──────────────────────────────────────────────────
-/// Single source of truth for Arjun Kumar's clinical profile.
+/// Single source of truth for Arjun Mishra's clinical profile.
 /// Used by: HomeScreen, ProfileScreen, RecordsScreen, EmergencySnapshotScreen,
 ///          AiService, ChatScreen.
 ///
@@ -7,9 +7,9 @@
 
 class Persona {
   // ─── IDENTITY ──────────────────────────────────────────────────────────────
-  static const String name = 'Arjun Kumar';
+  static const String name = 'Arjun Mishra';
   static const String abhaNumber = '91-4567-8901-2345';
-  static const String abhaAddress = 'arjun.kumar@abdm';
+  static const String abhaAddress = 'arjun.mishra@abdm';
   static const String dob = '12 Aug 1979';
   static const int age = 45;
   static const String gender = 'Male';

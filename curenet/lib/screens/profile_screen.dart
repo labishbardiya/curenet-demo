@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../core/voice_helper.dart';
 import '../core/translated_text.dart';
+import '../core/persona.dart';
+import '../core/auth_provider.dart';
 import '../core/persona.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -30,11 +33,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (savedData != null) {
       setState(() {
         userData = Map<String, String>.from(jsonDecode(savedData));
-        _isLoading = false;
       });
-    } else {
-      setState(() => _isLoading = false);
     }
+    
+    // Now override with auth provider data if available
+    if (mounted) {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final user = auth.userProfile;
+      if (user != null) {
+        setState(() {
+          if (user['name'] != null) userData['name'] = user['name'].toString();
+          if (user['abha'] != null) userData['abha'] = user['abha'].toString();
+          if (user['mobile'] != null) userData['mobile'] = user['mobile'].toString();
+        });
+      }
+    }
+    
+    setState(() => _isLoading = false);
   }
 
   Future<void> _saveUserData() async {
@@ -150,7 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   height: 58,
                   decoration: const BoxDecoration(color: Color(0xFF00A3A3), shape: BoxShape.circle),
                   child: Center(
-                    child: Text(userData['name']![0], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
+                    child: Text(userData['name']?.isNotEmpty == true ? userData['name']![0].toUpperCase() : 'U', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -158,8 +173,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TranslatedText(userData['name']!, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFF0D2240))),
-                      Text("ABHA: ${userData['abha']}", style: const TextStyle(fontSize: 13, color: Color(0xFF00C4C4))),
+                      TranslatedText(userData['name'] ?? Persona.name, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFF0D2240))),
+                      Text("ABHA: ${userData['abha'] ?? Persona.abhaNumber}", style: const TextStyle(fontSize: 13, color: Color(0xFF00C4C4))),
                     ],
                   ),
                 ),
