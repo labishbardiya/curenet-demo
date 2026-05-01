@@ -20,26 +20,10 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
   @override
   void initState() {
     super.initState();
-    _authenticateOnEntry();
     _loadLockerRecords();
   }
 
-  Future<void> _authenticateOnEntry() async {
-    final canBio = await BiometricService.canAuthenticate();
-    if (!canBio) {
-      // Device doesn't support biometrics, allow entry (or we could show a warning)
-      return;
-    }
 
-    final success = await BiometricService.authenticate(
-      reason: "Authenticate to access your Health Locker",
-    );
-
-    if (!success && mounted) {
-      // Failed or cancelled, kick back to Home
-      Navigator.pop(context);
-    }
-  }
 
   Future<void> _loadLockerRecords() async {
     final records = await OcrService.getLockerRecords();
@@ -47,7 +31,16 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
   }
 
   void _unlockAndView(Map<String, dynamic> record, String title) async {
-    // Open the rendered FHIR view if we have full data
+    // 1. Biometric check for EACH file
+    final canBio = await BiometricService.canAuthenticate();
+    if (canBio) {
+      final success = await BiometricService.authenticate(
+        reason: "Authenticate to view $title",
+      );
+      if (!success) return; // User cancelled or failed
+    }
+
+    // 2. Open the rendered FHIR view if we have full data
     if (record['uiData'] != null && mounted) {
       Navigator.push(context, MaterialPageRoute(
         builder: (_) => ScanResultScreen(
@@ -208,13 +201,13 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
                   color: const Color(0xFFE6F7EF),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const TranslatedText("View",
+                child: const TranslatedText("Unlock",
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-                    color: Color(0xFF22A36A))),
+                    color: Color(0xFF6B4E9B))),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.visibility, size: 18,
-                color: Color(0xFF22A36A)),
+              const Icon(Icons.lock_person, size: 18,
+                color: Color(0xFF6B4E9B)),
             ]),
           ],
         ),

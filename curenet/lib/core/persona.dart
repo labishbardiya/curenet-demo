@@ -1,5 +1,5 @@
 /// ─── CureNet Demo Persona ──────────────────────────────────────────────────
-/// Single source of truth for Priya Sharma's clinical profile.
+/// Single source of truth for Arjun Kumar's clinical profile.
 /// Used by: HomeScreen, ProfileScreen, RecordsScreen, EmergencySnapshotScreen,
 ///          AiService, ChatScreen.
 ///
@@ -7,79 +7,78 @@
 
 class Persona {
   // ─── IDENTITY ──────────────────────────────────────────────────────────────
-  static const String name = 'Priya Sharma';
-  static const String abhaNumber = '91-2345-6789-0123';
-  static const String abhaAddress = 'priya.sharma@abdm';
-  static const String dob = '14 Mar 1985';
-  static const int age = 39;
-  static const String gender = 'Female';
-  static const String bloodGroup = 'B+';
-  static const String mobile = '+91 98765 43210';
-  static const String email = 'priya.sharma@gmail.com';
-  static const String address = '42, MG Road, Jaipur, Rajasthan 302001';
+  static const String name = 'Arjun Kumar';
+  static const String abhaNumber = '91-4567-8901-2345';
+  static const String abhaAddress = 'arjun.kumar@abdm';
+  static const String dob = '12 Aug 1979';
+  static const int age = 45;
+  static const String gender = 'Male';
+  static const String bloodGroup = 'O+';
+  static const String mobile = '+91 95099 58988';
+  static const String email = 'arjun.kumar@gmail.com';
+  static const String address = 'Flat 402, Sunshine Apts, HSR Layout, Bengaluru 560102';
 
   // ─── EMERGENCY INFO ────────────────────────────────────────────────────────
-  static const String emergencyContact = '+91 98765 43210 (Ravi Sharma - Husband)';
-  static const String emergencyPhone = '+91 98765 43210';
-  static const String emergencyRelation = 'Ravi Sharma (Husband)';
-  static const String insuranceId = 'PMJAY-RJ-20230045';
+  static const String emergencyContact = '+91 95099 58989 (Sneha Kumar - Wife)';
+  static const String emergencyPhone = '+91 95099 58989';
+  static const String emergencyRelation = 'Sneha Kumar (Wife)';
+  static const String insuranceId = 'PMJAY-KA-20240092';
 
   // ─── MEDICAL CONDITIONS ────────────────────────────────────────────────────
   static const List<String> conditions = [
-    'Type 2 Diabetes Mellitus (Since 2021)',
     'Essential Hypertension (Since 2022)',
+    'Hyperlipidemia (High Cholesterol) (Since 2023)',
+    'Mild Fatty Liver (Grade 1)',
   ];
-  static const String conditionsShort = 'Type 2 Diabetes, Hypertension';
+  static const String conditionsShort = 'Hypertension, High Cholesterol';
 
   // ─── ALLERGIES ─────────────────────────────────────────────────────────────
-  static const List<String> allergies = ['Penicillin', 'Peanuts'];
-  static const String allergiesShort = 'Penicillin, Peanuts';
+  static const List<String> allergies = ['Sulfa Drugs', 'Dust Mites'];
+  static const String allergiesShort = 'Sulfa Drugs, Dust';
 
   // ─── ACTIVE MEDICATIONS ────────────────────────────────────────────────────
   static const List<Map<String, String>> medications = [
-    {'name': 'Amlodipine', 'dosage': '5mg', 'frequency': 'Once daily (morning)', 'for': 'Hypertension'},
-    {'name': 'Metformin', 'dosage': '500mg', 'frequency': 'Twice daily (after meals)', 'for': 'Diabetes'},
-    {'name': 'Atorvastatin', 'dosage': '10mg', 'frequency': 'Once daily (night)', 'for': 'Cholesterol'},
+    {'name': 'Telmisartan', 'dosage': '40mg', 'frequency': 'Once daily (morning)', 'for': 'Hypertension'},
+    {'name': 'Atorvastatin', 'dosage': '20mg', 'frequency': 'Once daily (night)', 'for': 'Cholesterol'},
+    {'name': 'Fish Oil', 'dosage': '1000mg', 'frequency': 'Once daily', 'for': 'Heart Health'},
   ];
 
   // ─── LATEST VITALS ─────────────────────────────────────────────────────────
   static const Map<String, String> vitals = {
-    'HbA1c': '6.2% (Pre-diabetic)',
-    'Fasting Glucose': '110 mg/dL',
-    'Blood Pressure': '138/88 mmHg',
-    'TSH': '3.8 uIU/mL (Normal)',
-    'Total Cholesterol': '185 mg/dL',
-    'LDL': '110 mg/dL',
-    'HDL': '52 mg/dL',
-    'BMI': '26.4 (Overweight)',
-    'Weight': '68 kg',
-    'Height': '160 cm',
+    'Blood Pressure': '132/84 mmHg',
+    'Total Cholesterol': '210 mg/dL',
+    'LDL': '145 mg/dL (High)',
+    'HDL': '42 mg/dL',
+    'Triglycerides': '180 mg/dL',
+    'HbA1c': '5.8% (Normal)',
+    'BMI': '27.2 (Overweight)',
+    'Weight': '82 kg',
+    'Height': '174 cm',
   };
 
   // ─── PHYSICIANS ────────────────────────────────────────────────────────────
   static const Map<String, String> primaryPhysician = {
-    'name': 'Dr. Suresh Kumar',
-    'specialty': 'General Medicine & Diabetes',
-    'hospital': 'Apollo Spectra, Jaipur',
-    'phone': '+91 94140 12345',
+    'name': 'Dr. Rajesh Mehta',
+    'specialty': 'Cardiologist',
+    'hospital': 'Manipal Hospital, Bengaluru',
+    'phone': '+91 80234 56789',
   };
 
   static const List<Map<String, String>> doctors = [
-    {'name': 'Dr. Suresh Kumar', 'specialty': 'General Medicine', 'hospital': 'Apollo Spectra, Jaipur'},
-    {'name': 'Dr. Meena Kapoor', 'specialty': 'Pathology / Lab Diagnostics', 'hospital': 'SRL Diagnostics, Jaipur'},
-    {'name': 'Dr. Anjali Mehta', 'specialty': 'Ophthalmology', 'hospital': 'Rajasthan Eye Centre, Jaipur'},
+    {'name': 'Dr. Rajesh Mehta', 'specialty': 'Cardiology', 'hospital': 'Manipal Hospital'},
+    {'name': 'Dr. Kavita Rao', 'specialty': 'General Physician', 'hospital': 'Cloudnine Clinics'},
+    {'name': 'Dr. Vikram Shah', 'specialty': 'Gastroenterologist', 'hospital': 'Aster CMI'},
   ];
 
   // ─── MEDICAL HISTORY (TIMELINE) ───────────────────────────────────────────
   static const List<Map<String, String>> history = [
-    {'date': '14 Mar 2026', 'event': 'HbA1c 6.2%, Fasting Glucose 110 mg/dL', 'doctor': 'Dr. Meena Kapoor', 'category': 'Labs'},
-    {'date': '28 Feb 2026', 'event': 'TSH 3.8 uIU/mL — Normal thyroid function', 'doctor': 'Dr. Suresh Kumar', 'category': 'Labs'},
-    {'date': '15 Feb 2026', 'event': 'Prescribed Amlodipine 5mg for Hypertension', 'doctor': 'Dr. Suresh Kumar', 'category': 'Prescriptions'},
-    {'date': '10 Jan 2026', 'event': 'Diabetic Retinopathy Screening — Normal', 'doctor': 'Dr. Anjali Mehta', 'category': 'Reports'},
-    {'date': '15 Dec 2025', 'event': 'Lipid Profile — Total Cholesterol 185 mg/dL', 'doctor': 'Dr. Meena Kapoor', 'category': 'Labs'},
-    {'date': '05 Nov 2025', 'event': 'ECG — Normal sinus rhythm', 'doctor': 'Dr. Suresh Kumar', 'category': 'Reports'},
-    {'date': '20 Sep 2025', 'event': 'Started Metformin 500mg for Diabetes', 'doctor': 'Dr. Suresh Kumar', 'category': 'Prescriptions'},
-    {'date': '10 Aug 2025', 'event': 'Diagnosed with Type 2 Diabetes Mellitus', 'doctor': 'Dr. Suresh Kumar', 'category': 'Reports'},
+    {'date': '20 Apr 2026', 'event': 'Lipid Profile — Total Cholesterol 210 mg/dL', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Labs'},
+    {'date': '15 Mar 2026', 'event': 'Follow-up for Hypertension — BP 132/84', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Reports'},
+    {'date': '10 Feb 2026', 'event': 'Liver Function Test — Mild elevation in ALT', 'doctor': 'Dr. Vikram Shah', 'category': 'Labs'},
+    {'date': '15 Jan 2026', 'event': 'Annual Physical — HbA1c 5.8%', 'doctor': 'Dr. Kavita Rao', 'category': 'Labs'},
+    {'date': '05 Dec 2025', 'event': 'USG Abdomen — Grade 1 Fatty Liver', 'doctor': 'Dr. Vikram Shah', 'category': 'Reports'},
+    {'date': '20 Oct 2025', 'event': 'Prescribed Atorvastatin 20mg for Lipid control', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Prescriptions'},
+    {'date': '10 Aug 2025', 'event': 'Treadmill Test (TMT) — Negative for Ischemia', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Reports'},
   ];
 
   // ─── PROFILE MAP (for legacy SharedPreferences consumers) ─────────────────

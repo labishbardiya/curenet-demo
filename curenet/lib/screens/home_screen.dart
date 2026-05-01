@@ -25,45 +25,6 @@ class HomeScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 8),
 
-              // ── BIOMETRIC SETUP PROMPT ──
-              FutureBuilder<bool>(
-                future: SecureStorageService.isBiometricsEnabled(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.done && snapshot.data == false) {
-                    return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F7F7),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF00A3A3), width: 1),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.fingerprint, color: Color(0xFF00A3A3)),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: TranslatedText(
-                              "Enable biometric login for faster access?",
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0D2240)),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () async {
-                              await SecureStorageService.setBiometricsEnabled(true);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Biometric login enabled!")),
-                              );
-                            },
-                            child: const TranslatedText("Enable"),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
 
               // ── TOP HEADER ──
               Padding(
@@ -113,6 +74,11 @@ class HomeScreen extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.translate, color: Color(0xFF0D2240)),
                       onPressed: () => Navigator.pushNamed(context, '/language-select'),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.list_alt, color: Color(0xFF0D2240)),
+                      tooltip: "Records",
+                      onPressed: () => Navigator.pushNamed(context, '/records'),
                     ),
                     IconButton(
                       icon: const Icon(Icons.notifications_outlined, color: Color(0xFF0D2240)),

@@ -176,31 +176,6 @@ class LoginOptionsScreen extends StatelessWidget {
 
                 const SizedBox(height: 10),
 
-                // Biometric Option (Conditional)
-                FutureBuilder<bool>(
-                  future: SecureStorageService.isBiometricsEnabled(),
-                  builder: (context, snapshot) {
-                    if (snapshot.data == true) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _buildOptionCard(
-                          context,
-                          icon: Icons.fingerprint,
-                          iconColor: const Color(0xFF22A36A),
-                          title: "Biometric Login",
-                          onTap: () async {
-                            final auth = Provider.of<AuthProvider>(context, listen: false);
-                            await auth.authenticateWithBiometrics();
-                            if (auth.status == AuthStatus.authenticated) {
-                              Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-                            }
-                          },
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
 
                 const SizedBox(height: 16),
 

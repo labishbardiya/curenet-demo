@@ -85,15 +85,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Get Public Key if not provided
-      final String effectivePublicKey = publicKey ?? _lastPublicKey ?? (await AbdmService.getPublicKey())['publicKey'];
-      
-      // 2. Encrypt OTP
-      final String encryptedOtp = AbdmCrypto.encryptRsa(otp, effectivePublicKey);
-      
       Map<String, dynamic> result;
       
-      // 3. Demo bypass for testing — accept 123456 or demo/dummy txnIds
+      // 1. IMMEDIATE Bypass for testing — accept 123456 or demo/dummy txnIds
+      // This prevents errors if the ABDM sandbox is down or public key fetch fails
       if (otp == '123456' || txnId == 'demo_txn' || txnId == 'dummy_txn') {
         result = {
           'token': 'demo_token',
@@ -104,7 +99,14 @@ class AuthProvider extends ChangeNotifier {
           'mobile': _lastMobile ?? '9509958988',
         };
       } else {
-        // 4. Real ABDM Verify based on flow
+        // 2. Real ABDM Path (only if not demo)
+        // Get Public Key if not provided
+        final String effectivePublicKey = publicKey ?? _lastPublicKey ?? (await AbdmService.getPublicKey())['publicKey'];
+        
+        // Encrypt OTP
+        final String encryptedOtp = AbdmCrypto.encryptRsa(otp, effectivePublicKey);
+        
+        // Real ABDM Verify based on flow
         if (flow == 'registration') {
           result = await AbdmService.verifyAadhaarOtpForRegistration(
             txnId: txnId,

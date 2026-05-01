@@ -59,12 +59,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>CureNet needs camera access to scan medical documents and prescriptions.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CureNet needs library access to upload existing medical records.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CureNet needs microphone access for voice-enabled health assistance.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>CureNet uses FaceID to secure your Health Locker records.</string>
 </dict>
 </plist>
