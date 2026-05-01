@@ -59,6 +59,9 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
       final XFile? photo = await _picker.pickImage(
         source: source,
         preferredCameraDevice: CameraDevice.rear,
+        maxWidth: 1600, // Sufficient for high-quality OCR
+        maxHeight: 1600,
+        imageQuality: 85, // Significant file size reduction with minimal quality loss
       );
 
       if (photo != null) {
@@ -182,7 +185,7 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
   }
 
   void _pollOCRStatus(String jobId) {
-    Timer.periodic(const Duration(seconds: 2), (timer) async {
+    Timer.periodic(const Duration(milliseconds: 1000), (timer) async {
       try {
         final response = await http.get(Uri.parse('$_ocrApiUrl/status/$jobId'));
         if (response.statusCode == 200) {

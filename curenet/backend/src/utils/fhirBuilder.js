@@ -29,6 +29,25 @@ function generateId() {
 
 // ─── Shared Resource Builders ────────────────────────────────────────────────
 
+function buildOrganizationResource(orgId, data) {
+    return {
+        fullUrl: `urn:uuid:${orgId}`,
+        resource: {
+            resourceType: "Organization",
+            id: orgId,
+            meta: {
+                profile: ["https://nrces.in/ndhm/fhir/r4/StructureDefinition/Organization"]
+            },
+            identifier: [{
+                system: "https://facility.ndhm.gov.in",
+                value: data.facility_id || "unknown"
+            }],
+            name: data.clinic || "Unknown Healthcare Facility",
+            active: true
+        }
+    };
+}
+
 function buildPatientResource(patientId, data) {
     const resource = {
         fullUrl: `urn:uuid:${patientId}`,
@@ -39,8 +58,8 @@ function buildPatientResource(patientId, data) {
                 profile: ["https://nrces.in/ndhm/fhir/r4/StructureDefinition/Patient"]
             },
             identifier: [{
-                system: "https://healthid.abdm.gov.in",
-                value: data.abha_id || "unknown",
+                system: "https://healthid.ndhm.gov.in",
+                value: data.abha_number || data.abha_id || "unknown",
                 type: {
                     coding: [{
                         system: "http://terminology.hl7.org/CodeSystem/v2-0203",
@@ -62,14 +81,6 @@ function buildPatientResource(patientId, data) {
         resource.resource.extension.push({
             url: "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Age",
             valueString: data.age
-        });
-    }
-
-    if (data.abha_address) {
-        resource.resource.extension = resource.resource.extension || [];
-        resource.resource.extension.push({
-            url: "https://nrces.in/ndhm/fhir/r4/StructureDefinition/AbhaAddress",
-            valueString: data.abha_address
         });
     }
 
@@ -135,6 +146,7 @@ function buildPrescriptionBundle(structuredData) {
     const bundleId = generateId();
     const patientId = generateId();
     const doctorId = generateId();
+    const orgId = generateId();
     const encounterId = generateId();
     const compositionId = generateId();
     const prescriptionDate = structuredData.date || timestamp.split('T')[0];
@@ -373,10 +385,20 @@ function buildPrescriptionBundle(structuredData) {
             type: {
                 coding: [{ system: "http://snomed.info/sct", code: "440545006", display: "Prescription record" }]
             },
+            category: [{
+                coding: [{
+                    system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                    code: "PHAR",
+                    display: "Pharmacy"
+                }]
+            }],
             subject: { reference: `urn:uuid:${patientId}` },
             encounter: { reference: `urn:uuid:${encounterId}` },
             date: prescriptionDate,
-            author: [{ reference: `urn:uuid:${doctorId}` }],
+            author: [
+                { reference: `urn:uuid:${doctorId}` },
+                { reference: `urn:uuid:${orgId}` }
+            ],
             title: "Prescription Record",
             section: sections
         }
@@ -396,6 +418,7 @@ function buildPrescriptionBundle(structuredData) {
             compositionResource,
             buildPatientResource(patientId, structuredData),
             buildPractitionerResource(doctorId, structuredData),
+            buildOrganizationResource(orgId, structuredData),
             buildEncounterResource(encounterId, patientId, prescriptionDate),
             ...medicationRequestEntries,
             ...observationEntries
@@ -413,6 +436,7 @@ function buildLabReportBundle(structuredData) {
     const bundleId = generateId();
     const patientId = generateId();
     const doctorId = generateId();
+    const orgId = generateId();
     const encounterId = generateId();
     const compositionId = generateId();
     const diagnosticReportId = generateId();
@@ -501,6 +525,13 @@ function buildLabReportBundle(structuredData) {
                 profile: ["https://nrces.in/ndhm/fhir/r4/StructureDefinition/DiagnosticReportLab"]
             },
             status: "final",
+            category: [{
+                coding: [{
+                    system: "http://terminology.hl7.org/CodeSystem/v2-0074",
+                    code: "LAB",
+                    display: "Laboratory"
+                }]
+            }],
             code: {
                 coding: [{
                     system: "http://snomed.info/sct",
@@ -512,7 +543,10 @@ function buildLabReportBundle(structuredData) {
             subject: { reference: `urn:uuid:${patientId}` },
             effectiveDateTime: reportDate,
             issued: timestamp,
-            performer: [{ reference: `urn:uuid:${doctorId}` }],
+            performer: [
+                { reference: `urn:uuid:${doctorId}` },
+                { reference: `urn:uuid:${orgId}` }
+            ],
             result: observationRefs
         }
     };
@@ -530,10 +564,20 @@ function buildLabReportBundle(structuredData) {
             type: {
                 coding: [{ system: "http://snomed.info/sct", code: "721981007", display: "Diagnostic studies report" }]
             },
+            category: [{
+                coding: [{
+                    system: "http://terminology.hl7.org/CodeSystem/v2-0074",
+                    code: "LAB",
+                    display: "Laboratory"
+                }]
+            }],
             subject: { reference: `urn:uuid:${patientId}` },
             encounter: { reference: `urn:uuid:${encounterId}` },
             date: reportDate,
-            author: [{ reference: `urn:uuid:${doctorId}` }],
+            author: [
+                { reference: `urn:uuid:${doctorId}` },
+                { reference: `urn:uuid:${orgId}` }
+            ],
             title: "Diagnostic Report - Lab",
             section: [{
                 title: "Lab Results",
@@ -562,6 +606,7 @@ function buildLabReportBundle(structuredData) {
             compositionResource,
             buildPatientResource(patientId, structuredData),
             buildPractitionerResource(doctorId, structuredData),
+            buildOrganizationResource(orgId, structuredData),
             buildEncounterResource(encounterId, patientId, reportDate),
             diagnosticReport,
             ...observationEntries

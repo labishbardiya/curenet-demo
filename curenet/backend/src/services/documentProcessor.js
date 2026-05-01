@@ -64,13 +64,19 @@ function processDocument(structuredData, rawText) {
  *   - No mixing. No redundant fields. Flat structures only.
  */
 function buildUiData(docType, data) {
+    const nhcxCategory = docType === 'prescription' ? 'Pharmacy' : (docType === 'lab_report' ? 'Diagnostic' : 'Professional');
+
     const ui = {
         document_type: docType,
+        nhcx_category: nhcxCategory,
         summary: {
             date: data.date || null,
             doctor: data.doctor_name || null,
+            doctor_reg_no: data.doctor_reg_no || null,
             facility: data.clinic || null,
-            patient: data.patient_name || null
+            facility_id: data.facility_id || null,
+            patient: data.patient_name || null,
+            gender: data.gender || null
         },
         medications: [],
         lab_results: [],

@@ -110,6 +110,40 @@ ${patientData ?? Persona.aiContext}
     }
   }
 
+  static Future<String> generateTitle(String firstMessage) async {
+    try {
+      final response = await http.post(
+        Uri.parse(_apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+        },
+        body: jsonEncode({
+          "model": "llama-3.1-8b-instant", // Using a smaller model for titles
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a helpful assistant that generates extremely short, concise titles for chat conversations. Return ONLY the title (max 4 words). No punctuation, no quotes."
+            },
+            {"role": "user", "content": "Summarize this message into a 3-word title: $firstMessage"}
+          ],
+          "temperature": 0.5,
+          "max_tokens": 10,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        String title = data['choices'][0]['message']['content'] ?? "New Chat";
+        title = title.replaceAll('"', '').replaceAll('.', '').trim();
+        return title;
+      }
+      return "New Chat";
+    } catch (e) {
+      return "New Chat";
+    }
+  }
+
   static void init() {
     debugPrint("AiService initialized with Groq (Llama 3.3).");
   }

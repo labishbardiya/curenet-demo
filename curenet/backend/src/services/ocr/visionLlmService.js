@@ -25,9 +25,12 @@ Return ONLY valid JSON in this exact format:
 {
   "patient_name": "full name or 'unclear'",
   "doctor_name": "full name with title or 'unclear'",
+  "doctor_reg_no": "Medical Registration Number (e.g. MCI-1234) or null",
   "clinic": "clinic/hospital name or 'unclear'",
+  "facility_id": "ABDM Facility ID if present (e.g. HFR-ID) or null",
   "date": "YYYY-MM-DD format",
   "age": "e.g. 35Y or 'unclear'",
+  "gender": "male/female/other",
   "diagnosis": "Impression/Diagnosis text (e.g. Hypoglycemia)",
   "chief_complaint": "symptoms (e.g. Giddiness, restlessness)",
   "vitals": {
@@ -49,7 +52,14 @@ Return ONLY valid JSON in this exact format:
       "extraction_method": "vision_llm"
     }
   ],
-  "lab_results": [],
+  "lab_results": [
+    {
+      "test_name": "e.g. HbA1c",
+      "value": "numeric result or text",
+      "unit": "e.g. % or mg/dL",
+      "reference_range": "e.g. 4.0-5.6"
+    }
+  ],
   "follow_up": {
     "date": "YYYY-MM-DD or null",
     "advice": ["advice item 1", "advice item 2"]
@@ -113,7 +123,7 @@ async function extractWithGroq(imagePath) {
                     "Authorization": `Bearer ${GROQ_API_KEY}`,
                     "Content-Type": "application/json"
                 },
-                timeout: 60000
+                timeout: 15000
             }
         );
 
@@ -185,7 +195,7 @@ async function extractWithNvidia(imagePath) {
                     "Content-Type": "application/json",
                     "Accept": "application/json"
                 },
-                timeout: 120000
+                timeout: 30000
             }
         );
 
