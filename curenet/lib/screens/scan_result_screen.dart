@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../core/translated_text.dart';
 import '../services/ocr_service.dart';
@@ -7,12 +8,14 @@ class ScanResultScreen extends StatefulWidget {
   final Map<String, dynamic> uiData;
   final Map<String, dynamic> fhirBundle;
   final Map<String, dynamic> abdmContext;
+  final String? imagePath;
 
   const ScanResultScreen({
     super.key,
     required this.uiData,
     required this.fhirBundle,
     required this.abdmContext,
+    this.imagePath,
   });
 
   @override
@@ -23,6 +26,8 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   bool _isSaving = false;
   bool _showFhirJson = false;
   bool _hasSaved = false;
+  bool _savedToLocker = false;
+  String? _currentLocalId;
 
   @override
   void initState() {
@@ -36,12 +41,15 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     if (_hasSaved) return;
     setState(() => _isSaving = true);
     
-    // Save to SharedPreferences
-    await OcrService.saveRecordLocally({
+    // Save to SharedPreferences (records + health_records)
+    final savedId = await OcrService.saveRecordLocally({
       'uiData': widget.uiData,
       'fhirBundle': widget.fhirBundle,
       'abdmContext': widget.abdmContext,
+      'imagePath': widget.imagePath,
     });
+    
+    _currentLocalId = savedId;
 
     if (mounted) {
       setState(() {
@@ -50,7 +58,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Record saved automatically!"),
+          content: Text("Record saved to your records."),
           backgroundColor: Color(0xFF00A3A3),
           duration: Duration(seconds: 2),
         ),
@@ -58,8 +66,68 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     }
   }
 
+  void _saveToLocker() async {
+    if (_savedToLocker || _currentLocalId == null) return;
+    setState(() => _isSaving = true);
+    
+    await OcrService.saveToLocker(_currentLocalId!);
+    
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+        _savedToLocker = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.lock, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text("Saved to Health Locker! 🔒"),
+            ],
+          ),
+          backgroundColor: Color(0xFF6B4E9B),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   void _goToRecords() {
     Navigator.pushReplacementNamed(context, '/records');
+  }
+
+  void _scanAnother() {
+    Navigator.pushReplacementNamed(context, '/doc-scan');
+  }
+
+  void _showOriginalImage() {
+    if (widget.imagePath == null) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(10),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: widget.imagePath!.startsWith('http') 
+                    ? Image.network(widget.imagePath!) 
+                    : Image.file(File(widget.imagePath!)),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 30),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -91,6 +159,14 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
             ),
           ],
         ),
+        actions: [
+          if (widget.imagePath != null)
+            IconButton(
+              icon: const Icon(Icons.image_outlined, color: Colors.white),
+              tooltip: "View Original Scan",
+              onPressed: () => _showOriginalImage(),
+            ),
+        ],
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Stack(
@@ -584,13 +660,46 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -5))],
       ),
       child: Row(
         children: [
+          // Save to Locker button
           Expanded(
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _goToRecords,
+            flex: 3,
+            child: ElevatedButton.icon(
+              onPressed: _isSaving || _savedToLocker ? null : _saveToLocker,
+              icon: Icon(
+                _savedToLocker ? Icons.lock : Icons.lock_outline,
+                size: 18,
+                color: Colors.white,
+              ),
+              label: TranslatedText(
+                _savedToLocker ? "SAVED TO LOCKER ✓" : "SAVE TO LOCKER",
+                style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 13),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _savedToLocker ? const Color(0xFF22A36A) : const Color(0xFF6B4E9B),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFF22A36A),
+                disabledForegroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Scan Another button
+          Expanded(
+            flex: 2,
+            child: ElevatedButton.icon(
+              onPressed: _scanAnother,
+              icon: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+              label: const TranslatedText(
+                "SCAN",
+                style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 13),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0D2240),
                 foregroundColor: Colors.white,
@@ -598,7 +707,6 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 0,
               ),
-              child: const TranslatedText("SAVE TO HEALTH LOCKER", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
             ),
           ),
         ],

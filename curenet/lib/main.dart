@@ -3,10 +3,20 @@ import 'core/theme.dart';
 import 'core/app_router.dart';
 import 'core/data_mode.dart';
 
+import 'package:provider/provider.dart';
+import 'core/auth_provider.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DataMode.init();
-  runApp(const CureNetApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ],
+      child: const CureNetApp(),
+    ),
+  );
 }
 
 class CureNetApp extends StatelessWidget {

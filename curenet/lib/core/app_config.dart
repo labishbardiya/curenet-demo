@@ -15,11 +15,11 @@ class AppConfig {
 
   /// ABDM Sandbox Client ID (Bridge ID)
   static String get abdmClientId =>
-      const String.fromEnvironment('ABDM_CLIENT_ID', defaultValue: '');
+      const String.fromEnvironment('ABDM_CLIENT_ID', defaultValue: 'SBXID_021821');
 
   /// ABDM Sandbox Client Secret
   static String get abdmClientSecret =>
-      const String.fromEnvironment('ABDM_CLIENT_SECRET', defaultValue: '');
+      const String.fromEnvironment('ABDM_CLIENT_SECRET', defaultValue: 'e7199d37-43bf-458f-8355-7b0dbe4ee30f');
 
   /// Bhashini Inference API Key
   static String get bhashiniApiKey =>

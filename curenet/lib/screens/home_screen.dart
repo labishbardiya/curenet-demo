@@ -2,12 +2,20 @@ import 'package:flutter/material.dart';
 import '../core/translated_text.dart';
 import '../core/persona.dart';
 import '../core/data_mode.dart';
+import 'package:provider/provider.dart';
+import '../core/auth_provider.dart';
+import '../services/secure_storage_service.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final user = auth.userProfile;
+    final userName = user?['name'] ?? Persona.name;
+    final abha = user?['abha'] ?? Persona.abhaNumber;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: SafeArea(
@@ -16,6 +24,46 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 8),
+
+              // ── BIOMETRIC SETUP PROMPT ──
+              FutureBuilder<bool>(
+                future: SecureStorageService.isBiometricsEnabled(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done && snapshot.data == false) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F7F7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF00A3A3), width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.fingerprint, color: Color(0xFF00A3A3)),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: TranslatedText(
+                              "Enable biometric login for faster access?",
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0D2240)),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              await SecureStorageService.setBiometricsEnabled(true);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Biometric login enabled!")),
+                              );
+                            },
+                            child: const TranslatedText("Enable"),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
 
               // ── TOP HEADER ──
               Padding(
@@ -48,13 +96,13 @@ class HomeScreen extends StatelessWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                Persona.name,
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0D2240)),
+                              Text(
+                                userName,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0D2240)),
                               ),
-                              const Text(
-                                Persona.abhaNumber,
-                                style: TextStyle(fontSize: 11, color: Color(0xFF9BA8BB)),
+                              Text(
+                                abha,
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF9BA8BB)),
                               ),
                             ],
                           ),
@@ -84,7 +132,7 @@ class HomeScreen extends StatelessWidget {
                     GestureDetector(
                       onLongPress: () => _showDevToggle(context),
                       child: TranslatedText(
-                        "Good morning, ${Persona.name.split(' ')[0]}",
+                        "Good morning, ${userName.split(' ')[0]}",
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0D2240)),
                       ),
                     ),

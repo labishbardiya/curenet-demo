@@ -3,43 +3,81 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/app_config.dart';
+import 'secure_storage_service.dart';
 
 /// ABDM Sandbox integration – M1 (ABHA creation/verification), M2 (HIP), M3 (HIU).
 /// Strictly follows: ABDM_ABHA_V3_AP_Is_V1_31_07_2025 PDF + AyushmanNHA YouTube workflows.
 ///
-/// M1 video: session → get public key → encrypt Aadhaar/OTP → request OTP → verify OTP
-/// → mobile update (optional) → email verify → ABHA address suggestion → confirm address
-/// → profile → download ABHA card. Verification: Aadhaar OTP, ABHA OTP, password, mobile, Aadhaar.
-/// Scan & share: register bridge URL, facility QR, on_share callback, profile on share.
-///
-/// Base URL (sandbox): https://dev.ndhm.gov.in/devservice/gateway
-/// Production: use gateway URL without dev/sandbox path as per ABDM docs.
+/// ABDM Sandbox has SEPARATE domains for different services:
+///   Gateway (sessions, bridges): https://dev.abdm.gov.in/gateway
+///   ABHA V3 (enrollment, profile, cert): https://abhasbx.abdm.gov.in/abha/api
+///   HIE-CM (consent, data-flow): https://dev.abdm.gov.in/api/hiecm
 class AbdmService {
-  static const String _sandboxBase = 'https://dev.ndhm.gov.in/devservice/gateway';
-  static String _baseUrl = _sandboxBase;
-  static String? _accessToken;
+  // Gateway – sessions, bridge registration
+  static const String _gatewayBase = 'https://dev.abdm.gov.in/gateway';
+  // ABHA – enrollment, profile, public certificate
+  static const String _abhaBase = 'https://abhasbx.abdm.gov.in/abha/api';
+  // HIE-CM – consent, data-flow
+  static const String _hiecmBase = 'https://dev.abdm.gov.in/api/hiecm';
 
-  static void setBaseUrl(String url) => _baseUrl = url;
-  static void setAccessToken(String token) => _accessToken = token;
+  static String? _accessToken;
+  static DateTime? _tokenCreatedAt;
+
+  static void setAccessToken(String token) {
+    _accessToken = token;
+    _tokenCreatedAt = DateTime.now();
+  }
 
   /// Ensures a valid session token exists before calling an authenticated API.
+  /// Gateway tokens expire after ~20 minutes; we refresh proactively at 15 min.
   static Future<void> _ensureAuth() async {
-    if (_accessToken != null) return;
+    // Check if cached token is still fresh (< 15 minutes old)
+    if (_accessToken != null && _tokenCreatedAt != null) {
+      final age = DateTime.now().difference(_tokenCreatedAt!);
+      if (age.inMinutes < 15) return;
+      // Token expired, clear it
+      _accessToken = null;
+      _tokenCreatedAt = null;
+    }
+
     await createSession(
       clientId: AppConfig.abdmClientId, 
-      clientSecret: AppConfig.abdmClientSecret
+      clientSecret: AppConfig.abdmClientSecret,
     );
   }
 
-  /// M1 – Get public key for RSA encryption (Aadhaar, OTP, mobile, email).
-  /// GET, no auth. Key expires in 3 months – refresh before expiry.
+  /// M1 – Get public key/certificate for RSA encryption (Aadhaar, OTP, mobile, email).
+  /// GET with auth. Encryption: RSA/ECB/OAEPWithSHA-1AndMGF1Padding.
   static Future<Map<String, dynamic>> getPublicKey() async {
-    final uri = Uri.parse('$_baseUrl/v1/gateway/auth/public-key');
-    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+    await _ensureAuth();
+    final uri = Uri.parse('$_abhaBase/v3/profile/public/certificate');
+    
+    var response = await _rawGet(uri);
+    
+    // If 401, the token is stale — force a new session and retry once
+    if (response.statusCode == 401) {
+      _accessToken = null;
+      _tokenCreatedAt = null;
+      await createSession(
+        clientId: AppConfig.abdmClientId,
+        clientSecret: AppConfig.abdmClientSecret,
+      );
+      response = await _rawGet(uri);
+    }
+    
     if (response.statusCode != 200) {
       throw AbdmException('Public key failed: ${response.statusCode}', response.body);
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  /// Raw authenticated GET (returns http.Response for status code checking)
+  static Future<http.Response> _rawGet(Uri uri) async {
+    return http.get(uri, headers: {
+      'Authorization': 'Bearer $_accessToken',
+      'REQUEST-ID': _newGuid(),
+      'TIMESTAMP': DateTime.now().toUtc().toIso8601String(),
+    }).timeout(const Duration(seconds: 10));
   }
 
   /// M1 – Create session. Returns access token for subsequent APIs.
@@ -48,17 +86,20 @@ class AbdmService {
   static Future<Map<String, dynamic>> createSession({
     required String clientId,
     required String clientSecret,
-    String xCmId = 'SBX',
+    String xCmId = 'sbx',
   }) async {
-    final uri = Uri.parse('$_baseUrl/v3/sessions');
+    // V3 session endpoint (NOT v0.5)
+    final uri = Uri.parse('$_gatewayBase/v0.5/sessions');
     final requestId = _newGuid();
     final timestamp = DateTime.now().toUtc().toIso8601String();
-    final response = await http.post(
-      uri,
+
+    // Try V3 endpoint first, fallback to v0.5
+    var response = await http.post(
+      Uri.parse('https://dev.abdm.gov.in/api/hiecm/gateway/v3/sessions'),
       headers: {
         'Content-Type': 'application/json',
-        'X-Request-Id': requestId,
-        'X-Timestamp': timestamp,
+        'REQUEST-ID': requestId,
+        'TIMESTAMP': timestamp,
         'X-CM-ID': xCmId,
       },
       body: jsonEncode({
@@ -68,12 +109,34 @@ class AbdmService {
       }),
     ).timeout(const Duration(seconds: 15));
 
+    // Fallback to v0.5 if V3 is unavailable
+    if (response.statusCode != 200 && response.statusCode != 202) {
+      response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'REQUEST-ID': requestId,
+          'TIMESTAMP': timestamp,
+          'X-CM-ID': xCmId,
+        },
+        body: jsonEncode({
+          'clientId': clientId,
+          'clientSecret': clientSecret,
+          'grantType': 'client_credentials',
+        }),
+      ).timeout(const Duration(seconds: 15));
+    }
+
     if (response.statusCode != 200 && response.statusCode != 202) {
       throw AbdmException('Session failed: ${response.statusCode}', response.body);
     }
     final map = jsonDecode(response.body) as Map<String, dynamic>;
     final token = map['accessToken'] as String?;
-    if (token != null) _accessToken = token;
+    if (token != null) {
+      _accessToken = token;
+      _tokenCreatedAt = DateTime.now();
+      await SecureStorageService.saveAccessToken(token);
+    }
     return map;
   }
 
@@ -82,8 +145,13 @@ class AbdmService {
   static Future<Map<String, dynamic>> generateAadhaarOtpForRegistration({
     required String encryptedAadhaar,
   }) async {
-    final uri = Uri.parse('$_baseUrl/v2/registration/aadhaar/generateOtp');
-    return _postWithAuth(uri, {'aadhaar': encryptedAadhaar});
+    final uri = Uri.parse('$_abhaBase/v3/enrollment/request/otp');
+    return _postWithAuth(uri, {
+      'scope': ['abha-enrol'],
+      'loginHint': 'aadhaar',
+      'loginId': encryptedAadhaar,
+      'otpSystem': 'aadhaar',
+    });
   }
 
   /// M1 – Verify Registration OTP.
@@ -91,8 +159,72 @@ class AbdmService {
     required String txnId,
     required String encryptedOtp,
   }) async {
-    final uri = Uri.parse('$_baseUrl/v2/registration/aadhaar/verifyOTP');
-    return _postWithAuth(uri, {'otp': encryptedOtp, 'txnId': txnId});
+    final uri = Uri.parse('$_abhaBase/v3/enrollment/enrol/byAadhaar');
+    return _postWithAuth(uri, {
+      'authData': {
+        'authMethods': ['otp'],
+        'otp': {'txnId': txnId, 'otpValue': encryptedOtp},
+      },
+      'consent': {'code': 'abha-enrollment', 'version': '1.4'},
+    });
+  }
+
+  /// M1 – Generate Mobile OTP for ABHA creation (Mobile flow).
+  static Future<Map<String, dynamic>> generateMobileOtp({
+    required String encryptedMobile,
+  }) async {
+    final uri = Uri.parse('$_abhaBase/v3/enrollment/request/otp');
+    return _postWithAuth(uri, {
+      'scope': ['abha-enrol'],
+      'loginHint': 'mobile',
+      'loginId': encryptedMobile,
+      'otpSystem': 'abdm',
+    });
+  }
+
+  /// M1 – Verify Mobile OTP.
+  static Future<Map<String, dynamic>> verifyMobileOtp({
+    required String txnId,
+    required String encryptedOtp,
+  }) async {
+    final uri = Uri.parse('$_abhaBase/v3/enrollment/enrol/byMobile');
+    return _postWithAuth(uri, {
+      'authData': {
+        'authMethods': ['otp'],
+        'otp': {'txnId': txnId, 'otpValue': encryptedOtp},
+      },
+      'consent': {'code': 'abha-enrollment', 'version': '1.4'},
+    });
+  }
+
+  /// Login – Request OTP for existing ABHA user login via mobile.
+  static Future<Map<String, dynamic>> requestLoginOtp({
+    required String encryptedAbhaIdOrMobile,
+    String loginHint = 'mobile',
+    String otpSystem = 'abdm',
+  }) async {
+    final uri = Uri.parse('$_abhaBase/v3/profile/login/request/otp');
+    return _postWithAuth(uri, {
+      'scope': ['abha-login', 'openid', 'profile'],
+      'loginHint': loginHint,
+      'loginId': encryptedAbhaIdOrMobile,
+      'otpSystem': otpSystem,
+    });
+  }
+
+  /// Login – Verify OTP for existing ABHA user login.
+  static Future<Map<String, dynamic>> verifyLoginOtp({
+    required String txnId,
+    required String encryptedOtp,
+  }) async {
+    final uri = Uri.parse('$_abhaBase/v3/profile/login/verify');
+    return _postWithAuth(uri, {
+      'scope': ['abha-login', 'openid', 'profile'],
+      'authData': {
+        'authMethods': ['otp'],
+        'otp': {'txnId': txnId, 'otpValue': encryptedOtp},
+      },
+    });
   }
 
   /// M1 – Request OTP for ABHA Verification / Login.
@@ -101,13 +233,13 @@ class AbdmService {
     required String encryptedAadhaar,
     String? txnId,
   }) async {
-    final uri = Uri.parse('$_baseUrl/v1/account/auth/init');
+    final uri = Uri.parse('$_abhaBase/v3/enrollment/request/otp');
     final body = {
       if (txnId != null && txnId.isNotEmpty) 'txnId': txnId,
-      'scope': 'abha-enroll',
-      'loginHint': 'Aadhaar',
+      'scope': ['abha-enrol'],
+      'loginHint': 'aadhaar',
       'loginId': encryptedAadhaar,
-      'otpSystem': 'Aadhaar',
+      'otpSystem': 'aadhaar',
     };
     return _postWithAuth(uri, body);
   }
@@ -118,7 +250,7 @@ class AbdmService {
     required String encryptedOtp,
     required String mobile,
   }) async {
-    final uri = Uri.parse('$_baseUrl/v1/account/auth/confirm');
+    final uri = Uri.parse('$_abhaBase/v3/enrollment/auth/byAadhaar');
     final body = {
       'authData': {
         'authMethod': 'OTP',
@@ -136,8 +268,9 @@ class AbdmService {
   static Future<Map<String, dynamic>> getAbhaAddressSuggestions({
     required String txnId,
   }) async {
-    final uri = Uri.parse('$_baseUrl/v1/account/abha/suggest');
-    return _getWithAuth(uri, extraHeaders: {'X-Transaction-Id': txnId});
+    final uri = Uri.parse('$_abhaBase/v3/enrollment/abha-address/suggest');
+    final result = await _getWithAuth(uri, extraHeaders: {'X-Transaction-Id': txnId});
+    return result as Map<String, dynamic>;
   }
 
   /// M1 – Confirm ABHA address (from suggestion or custom).
@@ -146,7 +279,7 @@ class AbdmService {
     required String abhaAddress,
     int preferred = 1,
   }) async {
-    final uri = Uri.parse('$_baseUrl/v1/account/abha/confirm');
+    final uri = Uri.parse('$_abhaBase/v3/enrollment/abha-address/create');
     return _postWithAuth(uri, {
       'txnId': txnId,
       'abhaAddress': abhaAddress,
@@ -156,13 +289,14 @@ class AbdmService {
 
   /// M1 – Get profile (GET). Requires X-Token from verify OTP response.
   static Future<Map<String, dynamic>> getProfile({required String xToken}) async {
-    final uri = Uri.parse('$_baseUrl/v1/account/profile');
-    return _getWithAuth(uri, extraHeaders: {'X-Token': xToken});
+    final uri = Uri.parse('$_abhaBase/v3/profile/account');
+    final result = await _getWithAuth(uri, extraHeaders: {'X-Token': xToken});
+    return result as Map<String, dynamic>;
   }
 
   /// M1 – Download ABHA card. Requires X-Token.
   static Future<List<int>> downloadAbhaCard({required String xToken}) async {
-    final uri = Uri.parse('$_baseUrl/v1/account/abha/card');
+    final uri = Uri.parse('$_abhaBase/v3/profile/account/abha-card');
     final requestId = _newGuid();
     final timestamp = DateTime.now().toUtc().toIso8601String();
     final response = await http.get(
@@ -184,8 +318,42 @@ class AbdmService {
   static Future<void> updateBridgeUrl({
     required String callbackUrl,
   }) async {
-    final uri = Uri.parse('$_baseUrl/v1/gateway/bridge/url');
-    await _postWithAuth(uri, {'url': callbackUrl});
+    final uri = Uri.parse('$_gatewayBase/v1/bridges');
+    await _patchWithAuth(uri, {'url': callbackUrl});
+  }
+
+  /// M1/M2 – Add/Update Services (HIP/HIU/Health-Locker).
+  static Future<void> addUpdateServices({
+    required List<Map<String, dynamic>> services,
+  }) async {
+    final uri = Uri.parse('$_gatewayBase/v1/bridges/addUpdateServices');
+    await _postWithAuth(uri, services);
+  }
+
+  /// M1/M2 – Get Added Services.
+  static Future<List<dynamic>> getServices() async {
+    final uri = Uri.parse('$_gatewayBase/v1/bridges/getServices');
+    return await _getWithAuth(uri) as List<dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> _patchWithAuth(Uri uri, Map<String, dynamic> body) async {
+    await _ensureAuth();
+    final requestId = _newGuid();
+    final timestamp = DateTime.now().toUtc().toIso8601String();
+    final response = await http.patch(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_accessToken',
+        'X-Request-Id': requestId,
+        'X-Timestamp': timestamp,
+      },
+      body: jsonEncode(body),
+    ).timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200 && response.statusCode != 202 && response.statusCode != 204) {
+      throw AbdmException('Patch failed: ${response.statusCode}', response.body);
+    }
+    return response.body.isEmpty ? {} : jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   /// M2 – Link Care Context: Associates patient records with ABHA.
@@ -194,7 +362,7 @@ class AbdmService {
     required String patientReference,
     required List<Map<String, String>> careContexts,
   }) async {
-    final uri = Uri.parse('$_baseUrl/api/hiecm/hip/v3/link/carecontext');
+    final uri = Uri.parse('$_hiecmBase/hip/v3/link/carecontext');
     final body = {
       'accessToken': _accessToken,
       'abhaAddress': abhaAddress,
@@ -210,7 +378,7 @@ class AbdmService {
     required String consentId,
     required String status,
   }) async {
-    final uri = Uri.parse('$_baseUrl/api/hiecm/consent/v3/request/hip/on-notify');
+    final uri = Uri.parse('$_hiecmBase/consent/v3/request/hip/on-notify');
     final body = {
       'requestId': requestId,
       'timestamp': DateTime.now().toUtc().toIso8601String(),
@@ -229,7 +397,7 @@ class AbdmService {
     required String transactionId,
     required String acknowledgementStatus,
   }) async {
-    final uri = Uri.parse('$_baseUrl/api/hiecm/data-flow/v3/health-information/hip/on-request');
+    final uri = Uri.parse('$_hiecmBase/data-flow/v3/health-information/hip/on-request');
     final body = {
       'requestId': requestId,
       'timestamp': DateTime.now().toUtc().toIso8601String(),
@@ -242,7 +410,7 @@ class AbdmService {
     return _postWithAuth(uri, body);
   }
 
-  static Future<Map<String, dynamic>> _postWithAuth(Uri uri, Map<String, dynamic> body) async {
+  static Future<Map<String, dynamic>> _postWithAuth(Uri uri, dynamic body) async {
     await _ensureAuth();
     final requestId = _newGuid();
     final timestamp = DateTime.now().toUtc().toIso8601String();
@@ -251,34 +419,36 @@ class AbdmService {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $_accessToken',
-        'X-Request-Id': requestId,
-        'X-Timestamp': timestamp,
-        'X-CM-ID': 'SBX',
+        'REQUEST-ID': requestId,
+        'TIMESTAMP': timestamp,
       },
       body: jsonEncode(body),
     ).timeout(const Duration(seconds: 15));
     if (response.statusCode != 200 && response.statusCode != 202) {
       throw AbdmException('Request failed: ${response.statusCode}', response.body);
     }
-    return response.body.isEmpty ? {} : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.body.isEmpty) return {};
+    final decoded = jsonDecode(response.body);
+    if (decoded is List) return {'data': decoded};
+    return decoded as Map<String, dynamic>;
   }
 
-  static Future<Map<String, dynamic>> _getWithAuth(Uri uri, {Map<String, String>? extraHeaders}) async {
+  static Future<dynamic> _getWithAuth(Uri uri, {Map<String, String>? extraHeaders}) async {
     await _ensureAuth();
     final requestId = _newGuid();
     final timestamp = DateTime.now().toUtc().toIso8601String();
     final headers = {
       'Authorization': 'Bearer $_accessToken',
-      'X-Request-Id': requestId,
-      'X-Timestamp': timestamp,
-      'X-CM-ID': 'SBX',
+      'REQUEST-ID': requestId,
+      'TIMESTAMP': timestamp,
       ...?extraHeaders,
     };
     final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 15));
     if (response.statusCode != 200) {
       throw AbdmException('Request failed: ${response.statusCode}', response.body);
     }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    final decoded = jsonDecode(response.body);
+    return decoded;
   }
 
   static String _newGuid() {

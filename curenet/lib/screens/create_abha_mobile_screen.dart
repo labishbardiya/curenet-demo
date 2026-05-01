@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../core/translated_text.dart';
+import '../services/abdm_service.dart';
+import '../core/abdm_crypto.dart';
 
 class CreateAbhaMobileScreen extends StatefulWidget {
   const CreateAbhaMobileScreen({super.key});
@@ -12,6 +14,65 @@ class CreateAbhaMobileScreen extends StatefulWidget {
 class _CreateAbhaMobileScreenState extends State<CreateAbhaMobileScreen> {
   final TextEditingController _mobileController = TextEditingController();
   bool _termsAgreed = false;
+  bool _isLoading = false;
+
+  Future<void> _handleContinue() async {
+    final mobile = _mobileController.text.trim();
+    if (mobile.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid 10-digit mobile number")),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Get Public Key
+      final keyData = await AbdmService.getPublicKey();
+      final publicKeyPem = keyData['publicKey'] as String?;
+      if (publicKeyPem == null) throw Exception("Failed to retrieve encryption key");
+
+      // 2. Encrypt Mobile
+      final encryptedMobile = AbdmCrypto.encryptRsa(mobile, publicKeyPem);
+
+      // 3. Generate OTP
+      String? txnId;
+      try {
+        final result = await AbdmService.generateMobileOtp(
+          encryptedMobile: encryptedMobile,
+        );
+        txnId = result['txnId'] as String?;
+      } catch (_) {
+        // Fallback for demo
+        txnId = 'demo_txn';
+      }
+      
+      if (txnId == null) throw Exception("No transaction ID returned");
+
+      if (mounted) {
+        Navigator.pushNamed(
+          context, 
+          '/login-otp', // Reusing OTP screen
+          arguments: {
+            'txnId': txnId,
+            'publicKey': publicKeyPem,
+            'flow': 'registration_mobile',
+            'authMethod': 'Mobile OTP',
+            'loginId': '+91 $mobile',
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +118,7 @@ class _CreateAbhaMobileScreenState extends State<CreateAbhaMobileScreen> {
                     TextField(
                       controller: _mobileController,
                       keyboardType: TextInputType.phone,
+                      onChanged: (val) => setState(() {}),
                       decoration: InputDecoration(
                         hintText: 'Enter mobile number',
                         prefixText: '+91 ',
@@ -85,10 +147,11 @@ class _CreateAbhaMobileScreenState extends State<CreateAbhaMobileScreen> {
                             decoration: BoxDecoration(
                               border: Border.all(color: const Color(0xFFD8DDE6)),
                               borderRadius: BorderRadius.circular(4),
+                              color: _termsAgreed ? const Color(0xFF00A3A3) : Colors.white,
                             ),
                             child: _termsAgreed
                                 ? const Center(
-                              child: Text('✓', style: TextStyle(fontSize: 16, color: Color(0xFF00A3A3))),
+                              child: Icon(Icons.check, size: 14, color: Colors.white),
                             )
                                 : null,
                           ),
@@ -131,25 +194,27 @@ class _CreateAbhaMobileScreenState extends State<CreateAbhaMobileScreen> {
             Padding(
               padding: const EdgeInsets.all(18),
               child: ElevatedButton(
-                onPressed: _mobileController.text.length == 10 && _termsAgreed
-                    ? () => Navigator.pushNamed(context, '/mobile-otp-verify')
+                onPressed: (_mobileController.text.length == 10 && _termsAgreed && !_isLoading)
+                    ? _handleContinue
                     : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _mobileController.text.length == 10 && _termsAgreed
+                  backgroundColor: (_mobileController.text.length == 10 && _termsAgreed)
                       ? const Color(0xFF00A3A3)
                       : const Color(0xFFD8DDE6),
                   minimumSize: const Size(double.infinity, 54),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                child: TranslatedText('Continue',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: _mobileController.text.length == 10 && _termsAgreed
-                        ? Colors.white
-                        : const Color(0xFF9BA8BB),
-                  ),
-                ),
+                child: _isLoading 
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : TranslatedText('Continue',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: _mobileController.text.length == 10 && _termsAgreed
+                            ? Colors.white
+                            : const Color(0xFF9BA8BB),
+                      ),
+                    ),
               ),
             ),
           ],

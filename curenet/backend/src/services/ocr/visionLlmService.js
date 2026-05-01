@@ -89,12 +89,12 @@ async function extractWithGroq(imagePath) {
         const imageContent = fs.readFileSync(imagePath).toString('base64');
         const mimeType = imagePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-        console.log('[VisionLLM] Requesting Groq (Llama 3.2 90B Vision) extraction...');
+        console.log('[VisionLLM] Requesting Groq (Llama 4 Scout) extraction...');
 
         const response = await axios.post(
             'https://api.groq.com/openai/v1/chat/completions',
             {
-                model: "llama-3.2-11b-vision-preview",
+                model: "meta-llama/llama-4-scout-17b-16e-instruct",
                 messages: [
                     {
                         role: "user",

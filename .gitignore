@@ -1,26 +1,28 @@
 # Root .gitignore for CureNet
 
-# Project specific docs and context to ignore
-COMPLETE_PROJECT_CONTEXT.md
-MIDTERM_REPORT.md
-CURENET_MINOR_PROJECT_REPORT.md
-PRESENTATION_NOTES.md
-Documentation/
-*.pdf
-*.docx
-*.xlsx
-curenet/report.js
-curenet.zip
+# ─── Generated Output & Test Data ──────────────────────────────────────
+curenet/backend/output_bundles/
+curenet/backend/uploads/
+curenet/backend/ocr_scan_result.json
+curenet/backend/scratch_doc.txt
+Implementation_Guide_for_Adoption_of_FHIR_in_ABDM_and_NHCX (1).pdf
 
-# Local Secrets & Environment
+# ─── Binary Data (too large for git) ──────────────────────────────────
+*.traineddata
+
+# ─── Local Secrets & Environment ──────────────────────────────────────
 .env
 .env.local
 .env.*.local
-curenet/.env
-curenet/.env.example
 secrets.json
 
-# System / IDE files
+# ─── Academic Docs (tracked separately) ───────────────────────────────
+*.pdf
+*.docx
+*.xlsx
+Documentation/
+
+# ─── System / IDE files ──────────────────────────────────────────────
 .DS_Store
 .idea/
 *.iml
@@ -28,7 +30,7 @@ secrets.json
 *.iws
 .vscode/
 
-# General Flutter/Dart ignores (Recursive)
+# ─── Flutter / Dart ──────────────────────────────────────────────────
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
@@ -38,7 +40,7 @@ secrets.json
 build/
 coverage/
 
-# Mobile specific build artifacts
+# ─── Mobile Build Artifacts ──────────────────────────────────────────
 /android/app/debug
 /android/app/profile
 /android/app/release
@@ -49,12 +51,11 @@ app.*.map.json
 **/google-services.json
 **/GoogleService-Info.plist
 
-# Logs and temporary files
+# ─── Logs & Temp ─────────────────────────────────────────────────────
 *.log
 *.bak
 *.swp
 *~
 
-# Node.js (report.js dependencies)
+# ─── Node.js ─────────────────────────────────────────────────────────
 node_modules/
-package-lock.json
