@@ -6,8 +6,26 @@ import 'package:provider/provider.dart';
 import '../core/auth_provider.dart';
 import '../services/secure_storage_service.dart';
 
-class HomeScreen extends StatelessWidget {
+import 'package:permission_handler/permission_handler.dart';
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _requestPermissions();
+  }
+
+  Future<void> _requestPermissions() async {
+    // Request camera permission on startup so it's ready for scanning
+    await Permission.camera.request();
+  }
 
   @override
   Widget build(BuildContext context) {

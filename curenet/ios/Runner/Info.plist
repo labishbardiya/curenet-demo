@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>CureNet needs access to your camera to scan medical documents and prescriptions.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CureNet needs access to your photo library to upload saved medical reports.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CureNet needs access to your microphone for voice health assistants.</string>
 </dict>
 </plist>

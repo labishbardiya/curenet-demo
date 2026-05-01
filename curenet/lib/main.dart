@@ -28,7 +28,7 @@ class CureNetApp extends StatelessWidget {
       title: 'CureNet',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      initialRoute: AppRouter.splash,
+      initialRoute: AppRouter.home,
       routes: AppRouter.routes,
     );
   }
