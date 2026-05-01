@@ -58,10 +58,19 @@ function buildPatientResource(patientId, data) {
     };
 
     if (data.age) {
-        resource.resource.extension = [{
+        resource.resource.extension = resource.resource.extension || [];
+        resource.resource.extension.push({
             url: "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Age",
             valueString: data.age
-        }];
+        });
+    }
+
+    if (data.abha_address) {
+        resource.resource.extension = resource.resource.extension || [];
+        resource.resource.extension.push({
+            url: "https://nrces.in/ndhm/fhir/r4/StructureDefinition/AbhaAddress",
+            valueString: data.abha_address
+        });
     }
 
     return resource;

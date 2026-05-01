@@ -208,6 +208,7 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
                     uiData: jsonData['data']['ui_data'] ?? {},
                     fhirBundle: jsonData['data']['fhir_bundle'] ?? jsonData['data']['fhirBundle'] ?? {},
                     abdmContext: jsonData['data']['abdmContext'] ?? {},
+                    imagePath: _pickedFile?.path,
                   ),
                 ),
               );

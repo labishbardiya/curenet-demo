@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../core/app_language.dart';
 import '../core/translated_text.dart';
+import 'package:provider/provider.dart';
+import '../core/auth_provider.dart';
+import '../services/secure_storage_service.dart';
 
 class LoginOptionsScreen extends StatelessWidget {
   const LoginOptionsScreen({super.key});
@@ -169,6 +172,34 @@ class LoginOptionsScreen extends StatelessWidget {
                   iconColor: const Color(0xFF00A3A3),
                   title: "Aadhaar Card",
                   onTap: () => Navigator.pushNamed(context, '/login-aadhaar'),
+                ),
+
+                const SizedBox(height: 10),
+
+                // Biometric Option (Conditional)
+                FutureBuilder<bool>(
+                  future: SecureStorageService.isBiometricsEnabled(),
+                  builder: (context, snapshot) {
+                    if (snapshot.data == true) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _buildOptionCard(
+                          context,
+                          icon: Icons.fingerprint,
+                          iconColor: const Color(0xFF22A36A),
+                          title: "Biometric Login",
+                          onTap: () async {
+                            final auth = Provider.of<AuthProvider>(context, listen: false);
+                            await auth.authenticateWithBiometrics();
+                            if (auth.status == AuthStatus.authenticated) {
+                              Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+                            }
+                          },
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
                 ),
 
                 const SizedBox(height: 16),

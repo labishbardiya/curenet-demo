@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../core/auth_provider.dart';
 import '../core/theme.dart';
 import '../core/translated_text.dart';
 import 'package:curenet/core/navigation_helper.dart';
@@ -179,17 +181,51 @@ class _LoginMobileScreenState extends State<LoginMobileScreen> {
                   const SizedBox(height: 32),
 
                   // Get OTP Button
-                  ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/login-otp'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00A3A3),
-                      minimumSize: const Size(double.infinity, 54),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: const TranslatedText(
-                      "Get OTP on Mobile",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                    ),
+                  Consumer<AuthProvider>(
+                    builder: (context, auth, _) {
+                      return ElevatedButton(
+                        onPressed: auth.status == AuthStatus.authenticating
+                            ? null
+                            : () async {
+                                final mobile = _mobileController.text.replaceAll(' ', '');
+                                if (mobile.length != 10) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter a valid 10-digit mobile number')),
+                                  );
+                                  return;
+                                }
+                                await auth.loginWithMobile(mobile);
+                                if (auth.status == AuthStatus.error) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(auth.error ?? 'An error occurred')),
+                                  );
+                                } else {
+                                  Navigator.pushNamed(context, '/login-otp', arguments: {
+                                    'txnId': auth.lastTxnId ?? '',
+                                    'loginId': '+91 ${mobile.substring(0, 5)} ${mobile.substring(5)}',
+                                    'authMethod': 'Mobile OTP',
+                                    'flow': 'login',
+                                    'publicKey': auth.lastPublicKey,
+                                  });
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00A3A3),
+                          minimumSize: const Size(double.infinity, 54),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: auth.status == AuthStatus.authenticating
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : const TranslatedText(
+                                "Get OTP on Mobile",
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                              ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 24),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../core/app_language.dart';
 import '../core/translated_text.dart';
+import 'package:provider/provider.dart';
+import '../core/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,6 +20,19 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     _startAutoSlide();
+    _checkAuth();
+  }
+
+  void _checkAuth() async {
+    // Wait for a second to show the splash
+    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (auth.isAuthenticated) {
+      _carouselTimer?.cancel();
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+    }
   }
 
   void _startAutoSlide() {

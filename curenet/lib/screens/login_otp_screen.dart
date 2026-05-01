@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:provider/provider.dart';
+import '../core/auth_provider.dart';
 import '../core/theme.dart';
 import '../core/translated_text.dart';
-import '../core/abdm_crypto.dart';
-import '../services/abdm_service.dart';
 import 'package:flutter/services.dart';
 import 'package:curenet/core/navigation_helper.dart';
 
@@ -25,15 +25,19 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   String? _txnId;
   String? _loginId;
   String? _authMethod;
+  String? _flow;
+  String? _publicKey;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     if (args != null && _txnId == null) {
-      _authMethod = args['authMethod'] as String? ?? 'Mobile OTP';
-      _loginId = args['loginId'] as String? ?? '+91 98765 43210';
+      _authMethod = args['authMethod'] as String? ?? (args['flow'] == 'registration' ? 'Aadhaar OTP' : 'Mobile OTP');
+      _loginId = args['loginId'] as String? ?? (args['flow'] == 'registration' ? 'your Aadhaar-linked mobile' : '+91 98765 43210');
       _txnId = args['txnId'] as String?;
+      _flow = args['flow'] as String?;
+      _publicKey = args['publicKey'] as String?;
     }
   }
 
@@ -87,48 +91,28 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   }
 
   Future<void> _verifyOtp() async {
-    setState(() {
-      _isLoading = true;
-      _showError = false;
-    });
-
+    final auth = Provider.of<AuthProvider>(context, listen: false);
     try {
-      // If we have a transaction ID from M1 ABDM Sandbox, try validating it live
-      if (_txnId != null) {
-        final keyMap = await AbdmService.getPublicKey();
-        final String publicKey = keyMap['publicKey'];
-        final String encryptedOtp = AbdmCrypto.encryptRsa(_otp, publicKey);
+      await auth.verifyOtp(
+        _txnId ?? 'dummy_txn', 
+        _otp, 
+        flow: _flow ?? 'login',
+        publicKey: _publicKey,
+      );
 
-        final response = await AbdmService.verifyAadhaarOtp(
-          txnId: _txnId!,
-          encryptedOtp: encryptedOtp,
-          mobile: _loginId ?? '',
-        );
-
-        // Verification successful, X-Token acts as authorization
-        print("ABDM Verification Success: ${response['authData']}");
+      if (auth.status == AuthStatus.authenticated) {
         _timer?.cancel();
         if (!mounted) return;
         Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-        return;
       }
     } catch (e) {
-      print("ABDM M1 OTP Verification failed (Sandbox Offline): $e");
-    }
-
-    // Fallback: Local Simulation if Sandbox is offline or no txnId
-    if (_otp == '123456') {
-      _timer?.cancel();
-      if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-    } else {
       if (!mounted) return;
       setState(() {
         _showError = true;
-        _isLoading = false;
       });
       // Clear on error
       Future.delayed(const Duration(milliseconds: 800), () {
+        if (!mounted) return;
         for (var c in _controllers) {
           c.clear();
         }
@@ -277,17 +261,27 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                   const SizedBox(height: 32),
 
                   // Verify Button
-                  ElevatedButton(
-                    onPressed: _otp.length == 6 ? _verifyOtp : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00A3A3),
-                      minimumSize: const Size(double.infinity, 54),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: const TranslatedText(
-                      "Verify OTP →",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                    ),
+                  Consumer<AuthProvider>(
+                    builder: (context, auth, _) {
+                      return ElevatedButton(
+                        onPressed: (_otp.length == 6 && auth.status != AuthStatus.authenticating) ? _verifyOtp : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00A3A3),
+                          minimumSize: const Size(double.infinity, 54),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: auth.status == AuthStatus.authenticating
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : const TranslatedText(
+                                "Verify OTP →",
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                              ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 20),
