@@ -94,11 +94,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       onPressed: () => Navigator.pushNamed(context, '/language-select'),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.list_alt, color: Color(0xFF0D2240)),
-                      tooltip: "Records",
-                      onPressed: () => Navigator.pushNamed(context, '/records'),
-                    ),
-                    IconButton(
                       icon: const Icon(Icons.notifications_outlined, color: Color(0xFF0D2240)),
                       onPressed: () => Navigator.pushNamed(context, '/notifications'),
                     ),

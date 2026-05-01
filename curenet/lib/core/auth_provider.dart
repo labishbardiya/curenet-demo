@@ -4,6 +4,7 @@ import '../services/abdm_service.dart';
 import '../services/secure_storage_service.dart';
 import '../core/abdm_crypto.dart';
 import '../services/biometric_service.dart';
+import '../core/data_mode.dart';
 
 enum AuthStatus { unauthenticated, authenticating, authenticated, error }
 
@@ -57,25 +58,35 @@ class AuthProvider extends ChangeNotifier {
       
       final String encryptedMobile = AbdmCrypto.encryptRsa(mobile, publicKey);
       
-      // Try real ABDM login; fall back to demo if sandbox is unreachable
+      // Try real ABDM login
       try {
         final result = await AbdmService.requestLoginOtp(
           encryptedAbhaIdOrMobile: encryptedMobile,
         );
         _lastTxnId = result['txnId'] as String?;
-      } catch (_) {
-        // Demo fallback — allows testing with OTP 123456
-        _lastTxnId = 'demo_txn';
+      } catch (e) {
+        if (DataMode.isDemo.value) {
+          // Demo fallback — allows testing with OTP 123456
+          _lastTxnId = 'demo_txn';
+        } else {
+          rethrow;
+        }
       }
       
       _status = AuthStatus.unauthenticated;
       notifyListeners();
     } catch (e) {
-      // Even if public key fails, allow demo login
-      _lastTxnId = 'demo_txn';
-      _lastMobile = mobile;
-      _status = AuthStatus.unauthenticated;
-      notifyListeners();
+      if (DataMode.isDemo.value) {
+        // Even if public key fails, allow demo login
+        _lastTxnId = 'demo_txn';
+        _lastMobile = mobile;
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+      } else {
+        _status = AuthStatus.error;
+        _error = e.toString();
+        notifyListeners();
+      }
     }
   }
 
@@ -87,16 +98,15 @@ class AuthProvider extends ChangeNotifier {
     try {
       Map<String, dynamic> result;
       
-      // 1. IMMEDIATE Bypass for testing — accept 123456 or demo/dummy txnIds
-      // This prevents errors if the ABDM sandbox is down or public key fetch fails
-      if (otp == '123456' || txnId == 'demo_txn' || txnId == 'dummy_txn') {
+      // 1. Immediate Bypass ONLY if in Demo Mode and using test OTP
+      if (DataMode.isDemo.value && (otp == '123456' || txnId == 'demo_txn' || txnId == 'dummy_txn')) {
         result = {
           'token': 'demo_token',
           'x-token': 'demo_token',
-          'name': 'Labish Bardiya',
+          'name': 'Arjun Kumar',
           'ABHANumber': '91-6423-3886-4779',
           'healthIdNumber': '91-6423-3886-4779',
-          'mobile': _lastMobile ?? '9509958988',
+          'mobile': _lastMobile ?? '9876543210',
         };
       } else {
         // 2. Real ABDM Path (only if not demo)

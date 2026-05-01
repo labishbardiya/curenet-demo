@@ -29,6 +29,7 @@ class OcrService {
         'uiData': uiData,
         'fhirBundle': recordData['fhirBundle'],
         'abdmContext': abdmContext,
+        'imagePath': recordData['imagePath'],
         // Searchable/display metadata
         'title': _generateTitle(uiData, abdmContext),
         'doctor': summary['doctor'] ?? abdmContext['doctorName'] ?? 'Unknown',

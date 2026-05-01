@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import 'package:curenet/core/navigation_helper.dart';
@@ -139,6 +140,7 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
                           return _lockerCard(
                             icon: _docTypeIcon(docType),
                             title: title, date: date,
+                            imagePath: record['imagePath'],
                             onTap: () => _unlockAndView(record, title),
                           );
                         }),
@@ -165,7 +167,7 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
     );
   }
 
-  Widget _lockerCard({required IconData icon, required String title, required String date, required VoidCallback onTap}) {
+  Widget _lockerCard({required IconData icon, required String title, required String date, String? imagePath, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -195,6 +197,12 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
               ],
             )),
             Row(mainAxisSize: MainAxisSize.min, children: [
+              if (imagePath != null)
+                IconButton(
+                  icon: const Icon(Icons.image_outlined, color: Color(0xFF00A3A3), size: 22),
+                  onPressed: () => _showOriginalImage(imagePath),
+                ),
+              const SizedBox(width: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -209,6 +217,44 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
               const Icon(Icons.lock_person, size: 18,
                 color: Color(0xFF6B4E9B)),
             ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showOriginalImage(String imagePath) async {
+    // Biometric check before viewing image in locker
+    final canBio = await BiometricService.canAuthenticate();
+    if (canBio) {
+      final success = await BiometricService.authenticate(
+        reason: "Authenticate to view document image",
+      );
+      if (!success) return;
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(10),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: imagePath.startsWith('http') 
+                    ? Image.network(imagePath) 
+                    : Image.file(File(imagePath)),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 30),
+              onPressed: () => Navigator.pop(context),
+            ),
           ],
         ),
       ),

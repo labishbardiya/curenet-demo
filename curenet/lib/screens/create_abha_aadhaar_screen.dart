@@ -3,6 +3,7 @@ import '../core/theme.dart';
 import '../core/translated_text.dart';
 import '../services/abdm_service.dart';
 import '../core/abdm_crypto.dart';
+import '../core/data_mode.dart';
 
 class CreateAbhaAadhaarScreen extends StatefulWidget {
   const CreateAbhaAadhaarScreen({super.key});
@@ -44,9 +45,13 @@ class _CreateAbhaAadhaarScreenState extends State<CreateAbhaAadhaarScreen> {
           encryptedAadhaar: encryptedAadhaar,
         );
         txnId = result['txnId'] as String?;
-      } catch (_) {
-        // Fallback for demo
-        txnId = 'demo_txn';
+      } catch (e) {
+        if (DataMode.isDemo.value) {
+          // Fallback for demo
+          txnId = 'demo_txn';
+        } else {
+          rethrow;
+        }
       }
       
       if (txnId == null) throw Exception("No transaction ID returned");
