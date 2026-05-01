@@ -11,6 +11,8 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:curenet/core/navigation_helper.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../core/auth_provider.dart';
 import 'profile_screen.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -727,6 +729,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildDrawer() {
+    final auth = Provider.of<AuthProvider>(context);
+    final user = auth.userProfile;
+    final String userName = (user != null && user['name'] != null && user['name'].toString().trim().isNotEmpty)
+        ? user['name'].toString()
+        : Persona.name;
+
     return Drawer(
       backgroundColor: const Color(0xFF202123),
       child: Column(
@@ -850,7 +858,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.person_outline, color: Colors.white),
-            title: const Text("Priya Sharma", style: TextStyle(color: Colors.white)),
+            title: Text(userName, style: const TextStyle(color: Colors.white)),
             subtitle: const Text("View Profile", style: TextStyle(color: Color(0xFF9BA8BB), fontSize: 12)),
             onTap: () {
               Navigator.pop(context);

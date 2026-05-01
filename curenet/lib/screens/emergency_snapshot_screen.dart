@@ -4,6 +4,8 @@ import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'dart:typed_data';
 import '../core/persona.dart';
 import '../core/translated_text.dart';
+import 'package:provider/provider.dart';
+import '../core/auth_provider.dart';
 
 class EmergencySnapshotScreen extends StatefulWidget {
   const EmergencySnapshotScreen({super.key});
@@ -49,6 +51,15 @@ class _EmergencySnapshotScreenState extends State<EmergencySnapshotScreen>
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final user = auth.userProfile;
+    final String userName = (user != null && user['name'] != null && user['name'].toString().trim().isNotEmpty)
+        ? user['name'].toString()
+        : Persona.name;
+    final String abha = (user != null && user['abha'] != null && user['abha'].toString().trim().isNotEmpty)
+        ? user['abha'].toString()
+        : Persona.abhaNumber;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0D2240),
       appBar: AppBar(
@@ -140,7 +151,7 @@ class _EmergencySnapshotScreenState extends State<EmergencySnapshotScreen>
                               ),
                               child: Center(
                                 child: Text(
-                                  Persona.name[0],
+                                  userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
                                   style: const TextStyle(
                                     fontSize: 28,
                                     fontWeight: FontWeight.w900,
@@ -156,7 +167,7 @@ class _EmergencySnapshotScreenState extends State<EmergencySnapshotScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    Persona.name,
+                                    userName,
                                     style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w900,
@@ -172,7 +183,7 @@ class _EmergencySnapshotScreenState extends State<EmergencySnapshotScreen>
                                     ),
                                   ),
                                   Text(
-                                    "ABHA: ${Persona.abhaNumber}",
+                                    "ABHA: $abha",
                                     style: const TextStyle(
                                       fontSize: 11,
                                       color: Color(0xFF9BA8BB),

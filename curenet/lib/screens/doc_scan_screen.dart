@@ -2,8 +2,9 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
+import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import '../core/theme.dart';
@@ -23,19 +24,19 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
   late AnimationController _scanController;
   late Animation<double> _scanAnimation;
 
-  XFile? _pickedFile; // Use XFile for cross-platform (web + mobile) support
+  CameraController? _cameraController;
+  List<CameraDescription>? _cameras;
+  bool _isCameraInitialized = false;
+  bool _isFlashOn = false;
+
+  XFile? _pickedFile; 
   final ImagePicker _picker = ImagePicker();
   
   bool _isUploading = false;
   bool _isProcessing = false;
   String _statusText = "Scan prescriptions, reports & documents";
 
-  // On Android Emulator: 10.0.2.2 maps to host localhost
-  // On Web/Windows: use localhost directly
-  // On Android Emulator: 10.0.2.2 maps to host localhost
-  // On Web/Windows: use localhost directly
   String get _ocrApiUrl => AppConfig.ocrApiUrl;
-
 
   @override
   void initState() {
@@ -45,86 +46,31 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
       vsync: this,
     )..repeat(reverse: true);
 
-    _scanAnimation = Tween<double>(begin: 0.15, end: 0.80).animate(_scanController);
-  }
-
-  @override
-  void dispose() {
-    _scanController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final XFile? photo = await _picker.pickImage(
-        source: source,
-        preferredCameraDevice: CameraDevice.rear,
-        maxWidth: 1600, // Sufficient for high-quality OCR
-        maxHeight: 1600,
-        imageQuality: 85, // Significant file size reduction with minimal quality loss
-      );
-
-      if (photo != null) {
-        setState(() {
-          _pickedFile = photo;
-        });
-        _uploadXFile(photo);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to open media: $e')),
-      );
-    }
-  }
-
-  void _showPickerOptions() {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      builder: (BuildContext bc) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 16),
-              const TranslatedText("Choose Document Source", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              const SizedBox(height: 16),
-              ListTile(
-                  leading: const Icon(Icons.photo_library, color: Color(0xFF00A3A3)),
-                  title: const TranslatedText('Gallery / Upload Doc'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _pickImage(ImageSource.gallery);
-                  }),
-              ListTile(
-                leading: const Icon(Icons.camera_alt, color: Color(0xFF00A3A3)),
-                title: const TranslatedText('Take Health Photo'),
-                onTap: () {
-                   Navigator.of(context).pop();
-                   _handleCameraScan();
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      }
-    );
-  }
-
-  Future<void> _handleCameraScan() async {
-    // Check if permission was already granted (Ask only once)
-    var status = await Permission.camera.status;
+    _scanAnimation = Tween<double>(begin: 0.1, end: 0.9).animate(_scanController);
     
-    if (status.isDenied) {
-      status = await Permission.camera.request();
+    if (!kIsWeb) {
+      _initCamera();
     }
+  }
 
+  Future<void> _initCamera() async {
+    var status = await Permission.camera.request();
     if (status.isGranted) {
-      _pickImage(ImageSource.camera);
-    } else if (status.isPermanentlyDenied) {
+      try {
+        _cameras = await availableCameras();
+        if (_cameras != null && _cameras!.isNotEmpty) {
+          _cameraController = CameraController(
+            _cameras!.first,
+            ResolutionPreset.high,
+            enableAudio: false,
+          );
+          await _cameraController!.initialize();
+          if (mounted) setState(() => _isCameraInitialized = true);
+        }
+      } catch (e) {
+        print("Camera initialization error: $e");
+      }
+    } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Camera permission is disabled. Please enable it in Settings.')),
@@ -133,8 +79,64 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
     }
   }
 
+  @override
+  void dispose() {
+    _scanController.dispose();
+    _cameraController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleFlash() async {
+    if (_cameraController == null || !_isCameraInitialized) return;
+    try {
+      if (_isFlashOn) {
+        await _cameraController!.setFlashMode(FlashMode.off);
+      } else {
+        await _cameraController!.setFlashMode(FlashMode.torch);
+      }
+      setState(() => _isFlashOn = !_isFlashOn);
+    } catch (e) {
+      print("Flash toggle error: $e");
+    }
+  }
+
+  Future<void> _captureFromCamera() async {
+    if (_cameraController == null || !_isCameraInitialized || _isUploading) return;
+    try {
+      final XFile photo = await _cameraController!.takePicture();
+      setState(() => _pickedFile = photo);
+      // Turn off flash if it was on
+      if (_isFlashOn) _toggleFlash();
+      
+      _uploadXFile(photo);
+    } catch (e) {
+      print("Capture error: $e");
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+
+      if (photo != null) {
+        setState(() => _pickedFile = photo);
+        // Turn off flash if it was on
+        if (_isFlashOn) _toggleFlash();
+        _uploadXFile(photo);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to open gallery: $e')),
+      );
+    }
+  }
+
   Future<void> _uploadXFile(XFile file) async {
-    print('DEBUG: Initiating upload to $_ocrApiUrl');
     setState(() {
       _isUploading = true;
       _statusText = "Uploading Document to ABDM OCR...";
@@ -144,16 +146,9 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
       var request = http.MultipartRequest('POST', Uri.parse('$_ocrApiUrl/scan'));
       if (kIsWeb) {
         final bytes = await file.readAsBytes();
-        request.files.add(http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: file.name,
-        ));
+        request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: file.name));
       } else {
-        request.files.add(await http.MultipartFile.fromPath(
-          'file',
-          file.path,
-        ));
+        request.files.add(await http.MultipartFile.fromPath('file', file.path));
       }
 
       var streamedResponse = await request.send();
@@ -176,10 +171,15 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
     } catch (e) {
       setState(() {
         _isUploading = false;
+        _pickedFile = null; // Reset to show camera again
         _statusText = "Upload Failed! Try again.";
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload failed: $e')),
+        const SnackBar(
+          content: Text("Upload Failed. Please ensure sufficient lighting and that the document is a valid medical record."),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
       );
     }
   }
@@ -192,7 +192,6 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
           var jsonData = jsonDecode(response.body);
           
           if (jsonData['data']['state'] == 'processing' || jsonData['data']['state'] == 'pending') {
-            // Still processing
             return; 
           }
 
@@ -219,17 +218,20 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
           } else {
             // Failed
             timer.cancel();
-            String errorMsg = jsonData['data']['error'] ?? "Job Failed. Try again.";
+            String errorMsg = jsonData['data']['error'] ?? "Job Failed.";
+            errorMsg += " Ensure sufficient lighting and that it's a valid medical document (prescription, lab report, etc).";
+            
             setState(() {
               _isProcessing = false;
-              _statusText = errorMsg;
+              _pickedFile = null; // Reset to camera
+              _statusText = "Processing failed. Please try again.";
             });
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(errorMsg),
                   backgroundColor: Colors.red,
-                  duration: const Duration(seconds: 4),
+                  duration: const Duration(seconds: 5),
                 ),
               );
             }
@@ -282,142 +284,9 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
           ),
 
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-
-                  // Camera Viewfinder or Image Preview
-                  Container(
-                    height: 260,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF050F1A),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: const Color(0xFF00A3A3), width: 3),
-                    ),
-                    child: _pickedFile != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(19),
-                            // Image.network works on web via object URL; Image.file for native
-                            child: kIsWeb
-                                ? Image.network(_pickedFile!.path, fit: BoxFit.cover)
-                                : Image.file(File(_pickedFile!.path), fit: BoxFit.cover),
-                          )
-                        : GestureDetector(
-                            onTap: _handleCameraScan,
-                            child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  Positioned(top: 12, left: 12, child: _cornerBracket()),
-                                  Positioned(top: 12, right: 12, child: _cornerBracket(rotate: true)),
-                                  Positioned(bottom: 12, left: 12, child: _cornerBracket(rotate: true, bottom: true)),
-                                  Positioned(bottom: 12, right: 12, child: _cornerBracket(bottom: true)),
-
-                                  AnimatedBuilder(
-                                    animation: _scanAnimation,
-                                    builder: (context, child) {
-                                      return Positioned(
-                                        top: _scanAnimation.value * 220 + 20,
-                                        left: 20,
-                                        right: 20,
-                                        child: Container(
-                                          height: 2,
-                                          decoration: const BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [Colors.transparent, Color(0xFF00A3A3), Colors.transparent],
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-
-                                  const Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.camera_enhance, size: 48, color: Colors.white54),
-                                      SizedBox(height: 8),
-                                      TranslatedText("Camera Ready",
-                                        style: TextStyle(fontSize: 13, color: Color(0xFF9BA8BB)),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                          ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  if (_isUploading || _isProcessing)
-                    Column(
-                      children: [
-                        const CircularProgressIndicator(color: Color(0xFF00A3A3)),
-                        const SizedBox(height: 16),
-                        TranslatedText(
-                           _isUploading ? "Uploading..." : "Processing OCR into FHIR Bundle...",
-                           style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0D2240)),
-                        )
-                      ],
-                    )
-                  else ...[
-                    // Instruction card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F7F7),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF00A3A3).withOpacity(0.15)),
-                      ),
-                      child: const Column(
-                        children: [
-                          TranslatedText("Point camera at document",
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF00A3A3)),
-                          ),
-                          SizedBox(height: 8),
-                          TranslatedText("Align your prescription, lab report, or QR code within the frame. The document will be mapped to FHIR and saved.",
-                            style: TextStyle(fontSize: 13, color: Color(0xFF5A6880), height: 1.5),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // What you can scan
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: TranslatedText("WHAT YOU CAN SCAN",
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF9BA8BB), letterSpacing: 0.4),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _scanItem(Icons.medication, "Prescriptions & Medicines"),
-                    _scanItem(Icons.science, "Lab Reports & Blood Tests"),
-                    _scanItem(Icons.medical_services, "X-Ray & Radiology Reports"),
-                    _scanItem(Icons.qr_code_scanner, "Doctor's ABHA QR Code"),
-
-                    const SizedBox(height: 32),
-
-                    ElevatedButton.icon(
-                      onPressed: _showPickerOptions,
-                      icon: const Icon(Icons.add_a_photo, color: Colors.white),
-                      label: const TranslatedText("Select Document",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00A3A3),
-                        minimumSize: const Size(double.infinity, 54),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
-                  ]
-                ],
-              ),
-            ),
+            child: (_isUploading || _isProcessing)
+                ? _buildLoadingState()
+                : _buildScannerView(),
           ),
         ],
       ),
@@ -443,22 +312,186 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
     );
   }
 
-  Widget _scanItem(IconData icon, String title) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD8DDE6)),
-      ),
-      child: Row(
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 22, color: const Color(0xFF0D2240)),
-          const SizedBox(width: 12),
-          TranslatedText(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          if (_pickedFile != null && !kIsWeb) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.file(File(_pickedFile!.path), height: 300, fit: BoxFit.cover),
+            ),
+            const SizedBox(height: 32),
+          ],
+          const CircularProgressIndicator(color: Color(0xFF00A3A3)),
+          const SizedBox(height: 16),
+          TranslatedText(
+             _isUploading ? "Uploading Document securely..." : "Processing OCR into FHIR Bundle...",
+             style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0D2240), fontSize: 16),
+          )
         ],
       ),
+    );
+  }
+
+  Widget _buildScannerView() {
+    return Stack(
+      children: [
+        // 1. Live Camera Preview
+        if (_isCameraInitialized && _cameraController != null)
+          Positioned.fill(
+            child: CameraPreview(_cameraController!),
+          )
+        else
+          Container(
+            color: Colors.black,
+            child: const Center(child: CircularProgressIndicator(color: Color(0xFF00A3A3))),
+          ),
+          
+        // 2. Translucent Overlay with Cutout
+        Positioned.fill(
+          child: Column(
+            children: [
+              Container(height: 60, color: Colors.black54),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(width: 30, color: Colors.black54),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          // Transparent Center
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFF00A3A3), width: 2),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          // Scanning Laser Animation
+                          AnimatedBuilder(
+                            animation: _scanAnimation,
+                            builder: (context, child) {
+                              return Align(
+                                alignment: FractionalOffset(0.5, _scanAnimation.value),
+                                child: Container(
+                                  height: 2,
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [Colors.transparent, Color(0xFF00A3A3), Colors.transparent],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          // Corner brackets
+                          Positioned(top: 0, left: 0, child: _cornerBracket()),
+                          Positioned(top: 0, right: 0, child: _cornerBracket(rotate: true)),
+                          Positioned(bottom: 0, left: 0, child: _cornerBracket(rotate: true, bottom: true)),
+                          Positioned(bottom: 0, right: 0, child: _cornerBracket(bottom: true)),
+                        ],
+                      ),
+                    ),
+                    Container(width: 30, color: Colors.black54),
+                  ],
+                ),
+              ),
+              Container(height: 180, color: Colors.black54), // Room for bottom controls
+            ],
+          ),
+        ),
+
+        // 3. User Instructions Overlay
+        Positioned(
+          top: 80,
+          left: 40,
+          right: 40,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF00A3A3).withOpacity(0.3)),
+            ),
+            child: const Column(
+              children: [
+                TranslatedText("Point camera at document",
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF00C4C4)),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 6),
+                TranslatedText("Align prescriptions, lab reports, X-Rays, or QR codes within the frame. Ensure sufficient lighting. Documents are automatically sorted.",
+                  style: TextStyle(fontSize: 11, color: Colors.white70, height: 1.4),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // 4. Capture & Tools Overlay (Bottom Area)
+        Positioned(
+          bottom: 40,
+          left: 0,
+          right: 0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // Gallery Button
+              GestureDetector(
+                onTap: _pickFromGallery,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.photo_library, color: Colors.white, size: 28),
+                ),
+              ),
+              
+              // Capture Button
+              GestureDetector(
+                onTap: _captureFromCamera,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF00A3A3), width: 3),
+                  ),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00A3A3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 36),
+                  ),
+                ),
+              ),
+
+              // Torch/Flash Button
+              GestureDetector(
+                onTap: _toggleFlash,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: _isFlashOn ? const Color(0xFF00A3A3) : Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isFlashOn ? Icons.flash_on : Icons.flash_off, 
+                    color: Colors.white, 
+                    size: 28
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -482,31 +515,33 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
     );
   }
 
-  Widget _scanButton(BuildContext context) {
+    Widget _scanButton(BuildContext context) {
     return GestureDetector(
-      onTap: () {}, // Already on this screen
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF00A3A3), Color(0xFF00C4C4)]),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.camera_alt, size: 20, color: Colors.white),
-                  SizedBox(height: 2),
-                  TranslatedText("SCAN", style: TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1)),
-                ],
+      onTap: () {
+        if (ModalRoute.of(context)?.settings.name != '/doc-scan') {
+          Navigator.pushNamed(context, '/doc-scan');
+        }
+      },
+      child: Transform.translate(
+        offset: const Offset(0, -24),
+        child: Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF00A3A3), Color(0xFF00C4C4)]),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF00A3A3).withOpacity(0.4),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
               ),
-            ),
+            ],
           ),
-        ],
+          child: const Center(
+            child: Icon(Icons.camera_alt, size: 28, color: Colors.white),
+          ),
+        ),
       ),
     );
   }

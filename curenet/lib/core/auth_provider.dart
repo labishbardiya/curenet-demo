@@ -103,7 +103,7 @@ class AuthProvider extends ChangeNotifier {
         result = {
           'token': 'demo_token',
           'x-token': 'demo_token',
-          'name': 'Arjun Kumar',
+          'name': 'Arjun Mishra',
           'ABHANumber': '91-6423-3886-4779',
           'healthIdNumber': '91-6423-3886-4779',
           'mobile': _lastMobile ?? '9876543210',

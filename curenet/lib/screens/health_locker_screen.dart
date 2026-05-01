@@ -60,6 +60,9 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
           fhirBundle: Map<String, dynamic>.from(record['fhirBundle'] ?? {}),
           abdmContext: Map<String, dynamic>.from(record['abdmContext'] ?? {}),
           imagePath: record['imagePath'],
+          localId: record['localId'],
+          isSaved: true,
+          isFromLocker: true,
         ),
       ));
     }
@@ -207,22 +210,7 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
                 Text(date, style: const TextStyle(fontSize: 12, color: Color(0xFF9BA8BB))),
               ],
             )),
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE6F7EF),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const TranslatedText("Unlock",
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-                    color: Color(0xFF6B4E9B))),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.lock_person, size: 18,
-                color: Color(0xFF6B4E9B)),
-            ]),
+            const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFF9BA8BB)),
           ],
         ),
       ),
@@ -307,16 +295,34 @@ class _HealthLockerScreenState extends State<HealthLockerScreen> {
     ]));
   }
 
-  Widget _scanButton(BuildContext context) {
-    return GestureDetector(onTap: () => Navigator.pushNamed(context, '/doc-scan'),
-      child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-        Container(width: 56, height: 56,
-          decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF00A3A3), Color(0xFF00C4C4)]), borderRadius: BorderRadius.circular(18)),
-          child: const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.camera_alt, size: 20, color: Colors.white),
-            SizedBox(height: 2),
-            TranslatedText("SCAN", style: TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1)),
-          ]))),
-      ]));
+    Widget _scanButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        if (ModalRoute.of(context)?.settings.name != '/doc-scan') {
+          Navigator.pushNamed(context, '/doc-scan');
+        }
+      },
+      child: Transform.translate(
+        offset: const Offset(0, -24),
+        child: Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF00A3A3), Color(0xFF00C4C4)]),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF00A3A3).withOpacity(0.4),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: const Center(
+            child: Icon(Icons.camera_alt, size: 28, color: Colors.white),
+          ),
+        ),
+      ),
+    );
   }
 }
