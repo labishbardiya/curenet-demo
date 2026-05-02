@@ -1,0 +1,66 @@
+{
+  "_note1": "KEEP THIS FILE! Check it into a version control system (VCS) like git.",
+  "_note2": "ObjectBox manages crucial IDs for your object model. See docs for details.",
+  "_note3": "If you have VCS merge conflicts, you must resolve them according to ObjectBox docs.",
+  "entities": [
+    {
+      "id": "1:4839671412030688402",
+      "lastPropertyId": "7:3186489064714288677",
+      "name": "ClinicalAtom",
+      "properties": [
+        {
+          "id": "1:3288933182053715024",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:6314514369428770977",
+          "name": "type",
+          "type": 9,
+          "flags": 2048,
+          "indexId": "1:8476597014486933417"
+        },
+        {
+          "id": "3:3435304098307673017",
+          "name": "name",
+          "type": 9
+        },
+        {
+          "id": "4:8865704044950156852",
+          "name": "value",
+          "type": 9
+        },
+        {
+          "id": "5:103882922644610242",
+          "name": "unit",
+          "type": 9
+        },
+        {
+          "id": "6:8738036112024564513",
+          "name": "date",
+          "type": 9,
+          "flags": 2048,
+          "indexId": "2:1459313797680315671"
+        },
+        {
+          "id": "7:3186489064714288677",
+          "name": "metadataJson",
+          "type": 9
+        }
+      ],
+      "relations": []
+    }
+  ],
+  "lastEntityId": "1:4839671412030688402",
+  "lastIndexId": "2:1459313797680315671",
+  "lastRelationId": "0:0",
+  "lastSequenceId": "0:0",
+  "modelVersion": 5,
+  "modelVersionParserMinimum": 5,
+  "retiredEntityUids": [],
+  "retiredIndexUids": [],
+  "retiredPropertyUids": [],
+  "retiredRelationUids": [],
+  "version": 1
+}

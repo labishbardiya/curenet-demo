@@ -14,10 +14,12 @@ exports.initiateScan = async (req, res) => {
         }
 
         const jobId = generateId();
+        const userId = req.body.userId || req.query.userId || 'arjun';
 
         // Register tracking in memory/mock DB
         const newJob = new Record({
             jobId,
+            userId,
             status: 'pending',
             filePath: file.path
         });
@@ -29,6 +31,7 @@ exports.initiateScan = async (req, res) => {
             message: 'Scan job submitted to background worker.',
             data: {
                 jobId,
+                userId,
                 status: 'pending'
             }
         });

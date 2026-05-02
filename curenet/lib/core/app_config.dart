@@ -2,8 +2,8 @@
 /// API keys are read from compile-time env to avoid committing secrets.
 ///
 /// Run with:
-///   flutter run --dart-define=BHASHINI_API_KEY=your_inference_api_key
-/// Or set in IDE: Run > Edit Configurations > Additional run args.
+///   flutter run --dart-define=BACKEND_URL=http://YOUR_IP:3000
+///   (Change BACKEND_URL when switching networks/venues)
 class AppConfig {
   /// Groq API Key
   static String get groqApiKey =>
@@ -35,17 +35,15 @@ class AppConfig {
 
   static bool get hasBhashiniKey => bhashiniApiKey.isNotEmpty;
 
-  // ─── OCR API Configuration ─────────────────────────────────────────────────
-  /// Production OCR URL (replace with actual cloud endpoint once deployed)
-  static const String _ocrProductionUrl = 'https://api.curenet.in/api/ocr';
+  // ─── Backend URL (change via --dart-define=BACKEND_URL=http://NEW_IP:3000) ──
+  /// The single source of truth for all backend communication.
+  /// At a new venue, just change this one value to your new IP.
+  static String get backendUrl =>
+      const String.fromEnvironment('BACKEND_URL', defaultValue: 'http://172.16.56.80:3000');
 
-  /// Development OCR URL (use your machine's local IP for device testing)
-  static const String _ocrDevelopmentUrl = 'http://172.16.56.80:3000/api/ocr';
+  /// OCR API endpoint (derived from backendUrl)
+  static String get ocrApiUrl => '$backendUrl/api/ocr';
 
-  /// Toggle between production and development OCR endpoints
-  static const bool isOcrProduction = false;
-
-  static String get ocrApiUrl =>
-      isOcrProduction ? _ocrProductionUrl : _ocrDevelopmentUrl;
+  /// Emergency Card base URL (derived from backendUrl)  
+  static String get emergencyBaseUrl => '$backendUrl/api/emergency';
 }
-

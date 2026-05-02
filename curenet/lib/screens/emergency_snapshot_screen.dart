@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'dart:typed_data';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/persona.dart';
 import '../core/translated_text.dart';
+import '../core/data_mode.dart';
 import 'package:provider/provider.dart';
 import '../core/auth_provider.dart';
+import '../services/ocr_service.dart';
 
 class EmergencySnapshotScreen extends StatefulWidget {
   const EmergencySnapshotScreen({super.key});
@@ -19,6 +23,21 @@ class _EmergencySnapshotScreenState extends State<EmergencySnapshotScreen>
   final ScreenshotController _screenshotController = ScreenshotController();
   late AnimationController _pulseController;
 
+  // Dynamic data
+  List<String> _activeMedications = [];
+  List<String> _conditions = [];
+  List<String> _keyVitals = [];
+  bool _dataLoaded = false;
+  
+  String _allergies = "";
+  String _emergencyContactName = "";
+  String _emergencyContactPhone = "";
+  String _bloodGroup = "";
+  String _physician = "";
+
+  DateTime? _lastUpdated;
+  bool _isSyncing = false;
+
   @override
   void initState() {
     super.initState();
@@ -26,6 +45,186 @@ class _EmergencySnapshotScreenState extends State<EmergencySnapshotScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+    _checkAndLoad();
+  }
+
+  Future<void> _checkAndLoad() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastSyncStr = prefs.getString(DataMode.storageKey('emergency_snapshot_last_sync'));
+    
+    bool needsAutoRefresh = false;
+    if (lastSyncStr != null) {
+      final lastSync = DateTime.parse(lastSyncStr);
+      if (DateTime.now().difference(lastSync).inHours >= 12) {
+        needsAutoRefresh = true;
+      }
+      setState(() => _lastUpdated = lastSync);
+    } else {
+      needsAutoRefresh = true;
+    }
+
+    if (needsAutoRefresh) {
+      await _loadDynamicData(isAuto: true);
+    } else {
+      await _loadDynamicData();
+    }
+  }
+
+  Future<void> _loadDynamicData({bool isAuto = false}) async {
+    if (mounted) setState(() => _isSyncing = true);
+    
+    final prefs = await SharedPreferences.getInstance();
+    final bool isArjun = DataMode.activeUserId == DataMode.arjunId;
+    
+    // ── 1. Load Profile Data (User-editable) ──
+    final String? profileJson = prefs.getString(DataMode.storageKey('user_profile_data'));
+    if (profileJson != null && profileJson.isNotEmpty) {
+      final profile = Map<String, dynamic>.from(jsonDecode(profileJson));
+      _allergies = profile['allergies']?.toString() ?? (isArjun ? Persona.allergiesShort : '');
+      _bloodGroup = profile['bloodGroup']?.toString() ?? (isArjun ? Persona.bloodGroup : '');
+      _physician = profile['physician']?.toString() ?? (isArjun ? "${Persona.primaryPhysician['name']}\n${Persona.primaryPhysician['specialty']}" : '');
+      
+      // Parse merged emergency contact field
+      final ec = profile['emergencyContact']?.toString() ?? '';
+      if (ec.contains('—')) {
+        final parts = ec.split('—');
+        _emergencyContactName = parts[0].trim();
+        _emergencyContactPhone = parts.length > 1 ? parts[1].trim() : '';
+      } else if (ec.isNotEmpty) {
+        _emergencyContactName = ec;
+        _emergencyContactPhone = '';
+      } else {
+        _emergencyContactName = isArjun ? Persona.emergencyRelation : '';
+        _emergencyContactPhone = isArjun ? Persona.emergencyPhone : '';
+      }
+    } else {
+      // No profile saved — use Persona defaults ONLY for Arjun
+      _allergies = isArjun ? Persona.allergiesShort : '';
+      _emergencyContactName = isArjun ? Persona.emergencyRelation : '';
+      _emergencyContactPhone = isArjun ? Persona.emergencyPhone : '';
+      _bloodGroup = isArjun ? Persona.bloodGroup : '';
+      _physician = isArjun ? "${Persona.primaryPhysician['name']}\n${Persona.primaryPhysician['specialty']}" : '';
+    }
+    
+    // ── 2. Load Medical Records (Medications, Vitals from local storage) ──
+    final localRecords = await OcrService.getLocalRecords();
+    
+    // Also check health_records key for backward compatibility
+    final String? recordsJson = prefs.getString(DataMode.storageKey('health_records'));
+    List<Map<String, dynamic>> displayRecords = [];
+    if (recordsJson != null && recordsJson.isNotEmpty) {
+      displayRecords = List<Map<String, dynamic>>.from(jsonDecode(recordsJson));
+    }
+
+    // Simulating a slightly longer fetch for UI feedback if manually triggered
+    if (!isAuto) await Future.delayed(const Duration(milliseconds: 800));
+
+    // Demo mode fallback — ONLY for Arjun when he has no records
+    if (localRecords.isEmpty && displayRecords.isEmpty && isArjun) {
+      setState(() {
+        _activeMedications = Persona.medications
+            .map((m) => "${m['name']} ${m['dosage']}")
+            .toList();
+        _conditions = List<String>.from(Persona.conditions);
+        _keyVitals = ['BP: 132/84 mmHg', 'HbA1c: 5.8%', 'Glucose: 102 mg/dL'];
+        _dataLoaded = true;
+        _isSyncing = false;
+        _lastUpdated = DateTime.now();
+      });
+      return;
+    }
+    
+    // Non-Arjun with no records → show empty state
+    if (localRecords.isEmpty && displayRecords.isEmpty) {
+      setState(() {
+        _activeMedications = [];
+        _conditions = [];
+        _keyVitals = [];
+        _dataLoaded = true;
+        _isSyncing = false;
+        _lastUpdated = DateTime.now();
+      });
+      return;
+    }
+
+    // ── Parse records for dynamic data ──
+    final Set<String> medSet = {};
+    final Set<String> condSet = {};
+    final Map<String, String> latestVitals = {};
+
+    // Extract from local records (rich data with uiData)
+    for (var record in localRecords) {
+      final uiData = record['uiData'] as Map<String, dynamic>? ?? {};
+      
+      // Extract medications from uiData.medications (the parsed OCR data)
+      final medications = uiData['medications'] as List? ?? [];
+      for (var med in medications) {
+        final name = med['name']?.toString() ?? '';
+        final dosage = med['dosage']?.toString() ?? '';
+        if (name.isNotEmpty && name.length > 2) {
+          medSet.add(dosage.isNotEmpty ? '$name $dosage' : name);
+        }
+      }
+
+      // Extract lab values
+      final labResults = uiData['lab_results'] as List? ?? [];
+      for (var lab in labResults) {
+        final testName = lab['test_name']?.toString() ?? '';
+        final value = lab['value']?.toString() ?? '';
+        final unit = lab['unit']?.toString() ?? '';
+        if (testName.isNotEmpty && value.isNotEmpty) {
+          latestVitals[testName] = '$value $unit'.trim();
+        }
+      }
+
+      // Also check labValues map
+      final labValues = record['labValues'] as Map<String, dynamic>? ?? {};
+      labValues.forEach((key, value) {
+        if (key == 'HbA1c') latestVitals['HbA1c'] = '$value%';
+        if (key == 'Glucose') latestVitals['Glucose'] = '$value mg/dL';
+      });
+    }
+
+    // Fallback: Also extract from display records if no medications found
+    if (medSet.isEmpty) {
+      for (var record in displayRecords) {
+        final category = record['category']?.toString() ?? '';
+        if (category == 'Prescriptions') {
+          final title = record['title']?.toString() ?? '';
+          if (title.isNotEmpty && !title.contains('Processed by')) {
+            // Extract meaningful medication name from title
+            final cleaned = title
+                .replaceFirst('Prescription: ', '')
+                .replaceFirst('Prescription for ', '');
+            if (cleaned.length > 2) medSet.add(cleaned);
+          }
+        }
+      }
+    }
+
+    // Extract BP from summaries
+    for (var record in displayRecords) {
+      final summary = record['summary']?.toString() ?? '';
+      final bpMatch = RegExp(r'BP\s*(\d{2,3}/\d{2,3})').firstMatch(summary);
+      if (bpMatch != null) {
+        latestVitals['BP'] = '${bpMatch.group(1)} mmHg';
+      }
+    }
+
+    await prefs.setString(DataMode.storageKey('emergency_snapshot_last_sync'), DateTime.now().toIso8601String());
+
+    if (mounted) {
+      setState(() {
+        _activeMedications = medSet.isNotEmpty ? medSet.toList() : ['No active meds reported'];
+        _conditions = condSet.isNotEmpty ? condSet.toList() : (DataMode.activeUserId == DataMode.arjunId ? List<String>.from(Persona.conditions) : ['No conditions on record']);
+        _keyVitals = latestVitals.isNotEmpty
+            ? latestVitals.entries.map((e) => '${e.key}: ${e.value}').toList()
+            : ['No recent vitals found'];
+        _dataLoaded = true;
+        _isSyncing = false;
+        _lastUpdated = DateTime.now();
+      });
+    }
   }
 
   @override
@@ -55,13 +254,13 @@ class _EmergencySnapshotScreenState extends State<EmergencySnapshotScreen>
     final user = auth.userProfile;
     final String userName = (user != null && user['name'] != null && user['name'].toString().trim().isNotEmpty)
         ? user['name'].toString()
-        : Persona.name;
+        : (DataMode.activeUserId == DataMode.arjunId ? Persona.name : 'User');
     final String abha = (user != null && user['abha'] != null && user['abha'].toString().trim().isNotEmpty)
         ? user['abha'].toString()
-        : Persona.abhaNumber;
+        : (DataMode.activeUserId == DataMode.arjunId ? Persona.abhaNumber : '');
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D2240),
+      backgroundColor: const Color(0xFF0A121E),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -69,317 +268,177 @@ class _EmergencySnapshotScreenState extends State<EmergencySnapshotScreen>
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const TranslatedText(
-          "Emergency Card",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+        title: Column(
+          children: [
+            const Text(
+              "DIGITAL EMERGENCY PASS",
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF9BA8BB), letterSpacing: 2),
+            ),
+            if (_lastUpdated != null)
+              Text(
+                "UPDATED: ${_lastUpdated!.hour}:${_lastUpdated!.minute.toString().padLeft(2, '0')} · ${_lastUpdated!.day}/${_lastUpdated!.month}",
+                style: TextStyle(fontSize: 8, color: Colors.white.withOpacity(0.5), fontWeight: FontWeight.w700),
+              ),
+          ],
         ),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.download_rounded, color: Colors.white),
+            icon: _isSyncing 
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.refresh_rounded, color: Colors.white),
+            onPressed: _isSyncing ? null : () => _loadDynamicData(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
             onPressed: _captureAndSave,
-            tooltip: "Save to Gallery",
           ),
         ],
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Screenshot(
             controller: _screenshotController,
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(28),
                 boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
-                    blurRadius: 30,
-                    offset: const Offset(0, 12),
-                  ),
+                  BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 40, offset: const Offset(0, 20)),
                 ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ── RED EMERGENCY BANNER ──
+                  // ─── Header: Name & Status ───
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.all(24),
                     decoration: const BoxDecoration(
-                      color: Color(0xFFD32F2F),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(24),
-                        topRight: Radius.circular(24),
-                      ),
+                      color: Color(0xFF0D2240),
+                      borderRadius: BorderRadius.only(topLeft: Radius.circular(28), topRight: Radius.circular(28)),
                     ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Column(
                       children: [
-                        Icon(Icons.emergency, color: Colors.white, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          "EMERGENCY HEALTH CARD",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.5,
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              width: 60, height: 60,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0xFFD32F2F), width: 2),
+                              ),
+                              child: const Center(child: Icon(Icons.emergency, color: Color(0xFFD32F2F), size: 32)),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(userName.toUpperCase(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5)),
+                                  const SizedBox(height: 4),
+                                  Text("ABHA: $abha", style: const TextStyle(fontSize: 12, color: Color(0xFF9BA8BB), fontWeight: FontWeight.w700, letterSpacing: 1)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _pillLabel("AGE: ${DataMode.activeUserId == DataMode.arjunId ? Persona.age : '—'}", Colors.white24),
+                            _pillLabel("GENDER: ${DataMode.activeUserId == DataMode.arjunId ? Persona.gender : '—'}", Colors.white24),
+                            _pillLabel("BLOOD: $_bloodGroup", const Color(0xFFD32F2F)),
+                          ],
                         ),
                       ],
                     ),
                   ),
 
+                  // ─── Critical Alerts Section ───
                   Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(24),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── PATIENT IDENTITY ROW ──
-                        Row(
-                          children: [
-                            // Avatar
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF00A3A3), Color(0xFF1A3A5C)],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                                  style: const TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            // Name & ABHA
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    userName,
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFF0D2240),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    "${Persona.age} yrs · ${Persona.gender}",
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF5A6880),
-                                    ),
-                                  ),
-                                  Text(
-                                    "ABHA: $abha",
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF9BA8BB),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Blood Group Badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFDE8E8),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFFD32F2F).withOpacity(0.3)),
-                              ),
-                              child: Column(
-                                children: [
-                                  const Icon(Icons.bloodtype, size: 18, color: Color(0xFFD32F2F)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    Persona.bloodGroup,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFFD32F2F),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        _sectionTitle("⚠️ CRITICAL ALLERGIES"),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(color: const Color(0xFFFDE8E8), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFD32F2F).withOpacity(0.3))),
+                          child: Text(_allergies.isEmpty ? "None Reported" : _allergies, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFFD32F2F))),
                         ),
-
-                        const SizedBox(height: 18),
-                        const Divider(height: 1, color: Color(0xFFE8ECF0)),
-                        const SizedBox(height: 16),
-
-                        // ── ALLERGIES (RED HIGHLIGHT) ──
-                        _criticalSection(
-                          icon: Icons.warning_amber_rounded,
-                          label: "ALLERGIES",
-                          value: Persona.allergiesShort,
-                          bgColor: const Color(0xFFFDE8E8),
-                          iconColor: const Color(0xFFD32F2F),
-                          textColor: const Color(0xFFD32F2F),
-                        ),
-
+                        
+                        const SizedBox(height: 24),
+                        
+                        _sectionTitle("💊 ACTIVE MEDICATIONS"),
                         const SizedBox(height: 12),
+                        ..._activeMedications.map((m) => _listBullet(m, const Color(0xFFE07B39))),
 
-                        // ── ACTIVE MEDICATIONS ──
-                        _criticalSection(
-                          icon: Icons.medication_rounded,
-                          label: "ACTIVE MEDICATIONS",
-                          value: Persona.medications
-                              .map((m) => "${m['name']} ${m['dosage']} (${m['frequency']})")
-                              .join('\n'),
-                          bgColor: const Color(0xFFFFF3E6),
-                          iconColor: const Color(0xFFE07B39),
-                          textColor: const Color(0xFFB35A1F),
-                        ),
+                        const SizedBox(height: 24),
 
+                        _sectionTitle("🫀 CHRONIC CONDITIONS"),
                         const SizedBox(height: 12),
-
-                        // ── CONDITIONS ──
-                        _criticalSection(
-                          icon: Icons.monitor_heart_rounded,
-                          label: "CONDITIONS",
-                          value: Persona.conditionsShort,
-                          bgColor: const Color(0xFFE8F4FD),
-                          iconColor: const Color(0xFF2196F3),
-                          textColor: const Color(0xFF1565C0),
+                        Wrap(
+                          spacing: 8, runSpacing: 8,
+                          children: _conditions.map((c) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(color: const Color(0xFFE8F4FD), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF2196F3).withOpacity(0.3))),
+                            child: Text(c, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF1565C0))),
+                          )).toList(),
                         ),
 
-                        const SizedBox(height: 16),
-                        const Divider(height: 1, color: Color(0xFFE8ECF0)),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 24),
+                        const Divider(color: Color(0xFFE8ECF0), thickness: 1),
+                        const SizedBox(height: 24),
 
-                        // ── TWO-COLUMN: VITALS + PHYSICIAN ──
+                        // ─── Vitals & Physician ───
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Latest Vitals
-                            Expanded(
-                              child: _infoBlock(
-                                icon: Icons.favorite_rounded,
-                                iconColor: const Color(0xFFD32F2F),
-                                label: "KEY VITALS",
-                                lines: [
-                                  "BP: 138/88 mmHg",
-                                  "HbA1c: 6.2%",
-                                  "Glucose: 110 mg/dL",
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Primary Physician
-                            Expanded(
-                              child: _infoBlock(
-                                icon: Icons.medical_information_rounded,
-                                iconColor: const Color(0xFF00A3A3),
-                                label: "PHYSICIAN",
-                                lines: [
-                                  Persona.primaryPhysician['name']!,
-                                  Persona.primaryPhysician['specialty']!,
-                                  Persona.primaryPhysician['phone']!,
-                                ],
-                              ),
-                            ),
+                            Expanded(child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _sectionTitle("❤️ LATEST VITALS"),
+                                const SizedBox(height: 12),
+                                ..._keyVitals.map((v) => Text(v, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0D2240), height: 1.6))),
+                              ],
+                            )),
+                            Expanded(child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _sectionTitle("🩺 PHYSICIAN"),
+                                const SizedBox(height: 12),
+                                ..._physician.split('\n').map((l) => Text(l, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF5A6880), height: 1.4))),
+                              ],
+                            )),
                           ],
                         ),
 
-                        const SizedBox(height: 16),
-                        const Divider(height: 1, color: Color(0xFFE8ECF0)),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 32),
 
-                        // ── EMERGENCY CONTACT ──
+                        // ─── Emergency Footer ───
                         Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE6F7EF),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFF22A36A).withOpacity(0.3)),
-                          ),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(color: const Color(0xFFE6F7EF), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFF22A36A).withOpacity(0.3))),
                           child: Row(
                             children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF22A36A).withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Center(
-                                  child: Icon(Icons.call, size: 20, color: Color(0xFF22A36A)),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      "EMERGENCY CONTACT",
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFF22A36A),
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      Persona.emergencyRelation,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF0D2240),
-                                      ),
-                                    ),
-                                    Text(
-                                      Persona.emergencyPhone,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF22A36A),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // ── FOOTER ──
-                        Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF5F7FA),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.verified_user, size: 14, color: Color(0xFF00A3A3)),
-                              SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  "CureNet Verified · ABDM Linked · DPDP Compliant",
-                                  style: TextStyle(fontSize: 9, color: Color(0xFF9BA8BB), fontWeight: FontWeight.w600),
-                                ),
-                              ),
+                              const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF22A36A), size: 28),
+                              const SizedBox(width: 16),
+                              Expanded(child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text("EMERGENCY CONTACT", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF22A36A), letterSpacing: 1)),
+                                  const SizedBox(height: 4),
+                                  Text(_emergencyContactName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0D2240))),
+                                  Text(_emergencyContactPhone, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF22A36A))),
+                                ],
+                              )),
                             ],
                           ),
                         ),
@@ -395,107 +454,29 @@ class _EmergencySnapshotScreenState extends State<EmergencySnapshotScreen>
     );
   }
 
-  // ── CRITICAL SECTION (Allergies / Meds / Conditions) ──
-  Widget _criticalSection({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color bgColor,
-    required Color iconColor,
-    required Color textColor,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(14),
-      ),
+  Widget _sectionTitle(String title) {
+    return Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF9BA8BB), letterSpacing: 1));
+  }
+
+  Widget _listBullet(String text, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Center(child: Icon(icon, size: 18, color: iconColor)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: iconColor,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Padding(padding: const EdgeInsets.only(top: 6), child: Icon(Icons.circle, size: 6, color: color)),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0D2240)))),
         ],
       ),
     );
   }
 
-  // ── INFO BLOCK (Vitals / Physician) ──
-  Widget _infoBlock({
-    required IconData icon,
-    required Color iconColor,
-    required String label,
-    required List<String> lines,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 14, color: iconColor),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                color: iconColor,
-                letterSpacing: 0.8,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ...lines.map(
-          (l) => Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Text(
-              l,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0D2240),
-                height: 1.4,
-              ),
-            ),
-          ),
-        ),
-      ],
+  Widget _pillLabel(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(30)),
+      child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5)),
     );
   }
 }

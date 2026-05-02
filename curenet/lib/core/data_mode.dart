@@ -1,38 +1,50 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Global toggle for Demo Mode vs Live Mode.
+/// User Identity Management for CureNet.
 ///
-/// Demo Mode  → Uses hardcoded Persona data (Priya Sharma).
-/// Live Mode  → Uses real data from scanned/uploaded records stored in SharedPreferences.
+/// Only one special identity exists: 'arjun' (demo persona).
+/// ALL other phone numbers get a dynamic, isolated identity.
 ///
-/// Access:  DataMode.isDemo.value (bool)
-/// Toggle:  DataMode.toggle()
-///
-/// Hidden trigger: Triple-tap on the greeting text in HomeScreen.
+/// Identity determines:
+///   - Storage namespace (SharedPreferences keys)
+///   - AI context (Persona injected or not)
+///   - MongoDB record filtering (userId query param)
 class DataMode {
   DataMode._();
 
+  /// Kept for backward compatibility — true only when Arjun is active.
   static final ValueNotifier<bool> isDemo = ValueNotifier<bool>(true);
 
-  static void toggle() {
-    isDemo.value = !isDemo.value;
-    _persist();
+  /// The active user identity. Determines storage namespace + AI context.
+  static String _activeUserId = 'arjun';
+  static String get activeUserId => _activeUserId;
+
+  /// The demo persona userId
+  static const String arjunId = 'arjun';
+
+  /// Get a namespaced storage key for the current user.
+  /// e.g., storageKey('health_records') → 'arjun__health_records'
+  static String storageKey(String baseKey) {
+    return '${_activeUserId}__$baseKey';
   }
 
-  static void setDemo(bool value) {
-    isDemo.value = value;
+  /// Switch active user identity. Called by AuthProvider on login.
+  static void setUser(String userId) {
+    _activeUserId = userId;
+    isDemo.value = (userId == arjunId);
     _persist();
   }
 
   /// Load saved preference on app start.
   static Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    isDemo.value = prefs.getBool('data_mode_demo') ?? true;
+    _activeUserId = prefs.getString('active_user_id') ?? arjunId;
+    isDemo.value = (_activeUserId == arjunId);
   }
 
   static Future<void> _persist() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('data_mode_demo', isDemo.value);
+    await prefs.setString('active_user_id', _activeUserId);
   }
 }

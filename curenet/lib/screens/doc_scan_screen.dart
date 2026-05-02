@@ -12,6 +12,7 @@ import 'package:curenet/core/navigation_helper.dart';
 import '../core/translated_text.dart';
 import 'scan_result_screen.dart';
 import '../core/app_config.dart';
+import '../core/data_mode.dart';
 
 class DocScanScreen extends StatefulWidget {
   const DocScanScreen({super.key});
@@ -144,6 +145,8 @@ class _DocScanScreenState extends State<DocScanScreen> with SingleTickerProvider
 
     try {
       var request = http.MultipartRequest('POST', Uri.parse('$_ocrApiUrl/scan'));
+      // Tag the record with the active user identity
+      request.fields['userId'] = DataMode.activeUserId;
       if (kIsWeb) {
         final bytes = await file.readAsBytes();
         request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: file.name));

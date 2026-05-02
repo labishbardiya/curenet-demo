@@ -6,6 +6,11 @@ const RecordSchema = new mongoose.Schema({
         required: true,
         index: true
     },
+    userId: {
+        type: String,
+        default: 'arjun',
+        index: true
+    },
     status: {
         type: String,
         enum: ['pending', 'processing', 'completed', 'failed'],
@@ -39,6 +44,18 @@ const RecordSchema = new mongoose.Schema({
     },
     uiData: {
         type: Object
+    },
+    clinical_atoms: [{
+        type: { type: String }, // 'medication' | 'observation' | 'condition'
+        name: String,
+        value: String,
+        unit: String,
+        date: String,
+        metadata: Object
+    }],
+    vector_embedding: {
+        type: [Number], // Array of floats for Atlas Vector Search
+        index: true
     }
 }, { timestamps: true });
 

@@ -26,11 +26,12 @@ class Persona {
 
   // ─── MEDICAL CONDITIONS ────────────────────────────────────────────────────
   static const List<String> conditions = [
-    'Essential Hypertension (Since 2022)',
-    'Hyperlipidemia (High Cholesterol) (Since 2023)',
+    'Essential Hypertension (Since May 2025)',
+    'Dyslipidemia (High Cholesterol) (Since May 2025)',
+    'Type 2 Diabetes Mellitus (Since Feb 2026)',
     'Mild Fatty Liver (Grade 1)',
   ];
-  static const String conditionsShort = 'Hypertension, High Cholesterol';
+  static const String conditionsShort = 'Hypertension, Diabetes, High Cholesterol';
 
   // ─── ALLERGIES ─────────────────────────────────────────────────────────────
   static const List<String> allergies = ['Sulfa Drugs', 'Dust Mites'];
@@ -38,6 +39,7 @@ class Persona {
 
   // ─── ACTIVE MEDICATIONS ────────────────────────────────────────────────────
   static const List<Map<String, String>> medications = [
+    {'name': 'Metformin', 'dosage': '500mg', 'frequency': 'Twice daily (after meals)', 'for': 'Type 2 Diabetes'},
     {'name': 'Telmisartan', 'dosage': '40mg', 'frequency': 'Once daily (morning)', 'for': 'Hypertension'},
     {'name': 'Atorvastatin', 'dosage': '20mg', 'frequency': 'Once daily (night)', 'for': 'Cholesterol'},
     {'name': 'Fish Oil', 'dosage': '1000mg', 'frequency': 'Once daily', 'for': 'Heart Health'},
@@ -72,13 +74,15 @@ class Persona {
 
   // ─── MEDICAL HISTORY (TIMELINE) ───────────────────────────────────────────
   static const List<Map<String, String>> history = [
-    {'date': '20 Apr 2026', 'event': 'Lipid Profile — Total Cholesterol 210 mg/dL', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Labs'},
-    {'date': '15 Mar 2026', 'event': 'Follow-up for Hypertension — BP 132/84', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Reports'},
-    {'date': '10 Feb 2026', 'event': 'Liver Function Test — Mild elevation in ALT', 'doctor': 'Dr. Vikram Shah', 'category': 'Labs'},
-    {'date': '15 Jan 2026', 'event': 'Annual Physical — HbA1c 5.8%', 'doctor': 'Dr. Kavita Rao', 'category': 'Labs'},
-    {'date': '05 Dec 2025', 'event': 'USG Abdomen — Grade 1 Fatty Liver', 'doctor': 'Dr. Vikram Shah', 'category': 'Reports'},
-    {'date': '20 Oct 2025', 'event': 'Prescribed Atorvastatin 20mg for Lipid control', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Prescriptions'},
-    {'date': '10 Aug 2025', 'event': 'Treadmill Test (TMT) — Negative for Ischemia', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Reports'},
+    {'date': '25 Apr 2026', 'event': 'Cardiology Review — BP 132/84, may reduce Metformin', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Prescriptions'},
+    {'date': '20 Apr 2026', 'event': 'Quarterly Review — HbA1c improved to 5.8%', 'doctor': 'SRL Diagnostics', 'category': 'Labs'},
+    {'date': '10 Mar 2026', 'event': 'Liver Function Test — Mild ALT elevation, Grade 1 Fatty Liver', 'doctor': 'Dr. Vikram Shah', 'category': 'Labs'},
+    {'date': '20 Feb 2026', 'event': 'Metformin 500mg started for newly diagnosed Type 2 Diabetes', 'doctor': 'Dr. Kavita Rao', 'category': 'Prescriptions'},
+    {'date': '15 Jan 2026', 'event': 'Post-Diwali Blood Work — HbA1c spiked to 7.2%', 'doctor': 'SRL Diagnostics', 'category': 'Labs'},
+    {'date': '25 Aug 2025', 'event': 'TMT Report — Negative for Ischemia', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Reports'},
+    {'date': '10 Aug 2025', 'event': 'Atorvastatin increased to 20mg, Fish Oil added', 'doctor': 'Dr. Rajesh Mehta', 'category': 'Prescriptions'},
+    {'date': '20 Jun 2025', 'event': 'Baseline Blood Work — HbA1c 6.8%, Cholesterol 245', 'doctor': 'SRL Diagnostics', 'category': 'Labs'},
+    {'date': '15 May 2025', 'event': 'Initial diagnosis — Hypertension & Dyslipidemia. Telmisartan + Atorvastatin started', 'doctor': 'Dr. Kavita Rao', 'category': 'Prescriptions'},
   ];
 
   // ─── PROFILE MAP (for legacy SharedPreferences consumers) ─────────────────
@@ -89,7 +93,8 @@ class Persona {
     'mobile': mobile,
     'bloodGroup': bloodGroup,
     'allergies': allergiesShort,
-    'emergencyContact': emergencyContact,
+    'emergencyContact': '$emergencyRelation — $emergencyPhone',
+    'physician': '${primaryPhysician['name']}\n${primaryPhysician['specialty']}',
     'conditions': conditionsShort,
   };
 

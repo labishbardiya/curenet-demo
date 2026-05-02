@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/translated_text.dart';
 import '../core/persona.dart';
 import '../core/data_mode.dart';
-import 'package:provider/provider.dart';
 import '../core/auth_provider.dart';
-import '../services/secure_storage_service.dart';
-
+import '../services/ocr_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -33,10 +32,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = auth.userProfile;
     final String userName = (user != null && user['name'] != null && user['name'].toString().trim().isNotEmpty)
         ? user['name'].toString()
-        : Persona.name;
+        : (DataMode.activeUserId == DataMode.arjunId ? Persona.name : 'Live User');
     final String abha = (user != null && user['abha'] != null && user['abha'].toString().trim().isNotEmpty)
         ? user['abha'].toString()
-        : Persona.abhaNumber;
+        : (DataMode.activeUserId == DataMode.arjunId ? Persona.abhaNumber : '91-LIVE-0000-0001');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -115,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     GestureDetector(
                       onLongPress: () => _showDevToggle(context),
                       child: TranslatedText(
-                        "Good morning, ${userName.split(' ')[0]}",
+                        "Hello, ${userName.split(' ')[0]}",
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0D2240)),
                       ),
                     ),
@@ -208,39 +207,63 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              const SizedBox(height: 28),
+              // ── DYNAMIC RECENT RECORDS (max 3, hidden if empty) ──
+              FutureBuilder<List<Map<String, dynamic>>>(
+                future: DataMode.activeUserId == DataMode.arjunId 
+                    ? Future.value(<Map<String, dynamic>>[]) 
+                    : OcrService.getLocalRecords(),
+                builder: (context, snapshot) {
+                  List<Map<String, dynamic>> records = [];
 
-              // ── RECENT RECORDS HEADER ──
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const TranslatedText("Recent Records", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0D2240))),
-                    GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, '/records'),
-                      child: const TranslatedText("View all →", style: TextStyle(fontSize: 13, color: Color(0xFF00A3A3), fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ),
-              ),
+                  if (DataMode.activeUserId == DataMode.arjunId) {
+                    // Arjun demo fallback
+                    records = Persona.history.take(3).map((h) => <String, dynamic>{
+                      'title': (h['event'] as String? ?? 'Record').split(' — ').first,
+                      'date': h['date'],
+                      'category': h['category'],
+                    }).toList();
+                  } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                    records = snapshot.data!.take(3).toList();
+                  }
 
-              const SizedBox(height: 12),
+                  // If no records at all, hide entire section
+                  if (records.isEmpty) return const SizedBox.shrink();
 
-              // ── SAMPLE RECORDS ──
-              SizedBox(
-                height: 110,
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    _recordCard(context, "Blood Test", "14 Mar 2026", Icons.science),
-                    const SizedBox(width: 12),
-                    _recordCard(context, "Prescription", "15 Feb 2026", Icons.medication),
-                    const SizedBox(width: 12),
-                    _recordCard(context, "Eye Checkup", "10 Jan 2026", Icons.visibility),
-                  ],
-                ),
+                  return Column(
+                    children: [
+                      // Header row
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const TranslatedText("Recent Records", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0D2240))),
+                            GestureDetector(
+                              onTap: () => Navigator.pushNamed(context, '/records'),
+                              child: const TranslatedText("View all →", style: TextStyle(fontSize: 13, color: Color(0xFF00A3A3), fontWeight: FontWeight.w600)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Record cards
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          children: records.map((r) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _wideRecordCard(
+                              context,
+                              r['title']?.toString() ?? 'Medical Record',
+                              r['displayDate']?.toString() ?? r['date']?.toString() ?? '',
+                              _getCategoryIcon(r['category']?.toString() ?? ''),
+                            ),
+                          )).toList(),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
 
               const SizedBox(height: 24),
@@ -268,56 +291,80 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── HIDDEN DEV TOGGLE (triple-tap on greeting) ──
+  // ── IDENTITY INFO PANEL (triple-tap on greeting) ──
   void _showDevToggle(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final user = auth.userProfile;
+    final isArjun = DataMode.activeUserId == DataMode.arjunId;
+    
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.developer_mode, color: Color(0xFFE07B39), size: 22),
-              SizedBox(width: 8),
-              Text("Dev Mode", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Switch between hardcoded demo data and real uploaded records.",
-                style: TextStyle(fontSize: 13, color: Color(0xFF5A6880)),
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(isArjun ? Icons.person : Icons.person_outline, 
+                 color: isArjun ? const Color(0xFFE07B39) : const Color(0xFF00A3A3), size: 22),
+            const SizedBox(width: 8),
+            Text(isArjun ? "Demo Identity" : "Live Identity", 
+                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _infoRow("Identity", isArjun ? "Arjun Mishra (Demo)" : "Live User"),
+            _infoRow("User ID", DataMode.activeUserId),
+            _infoRow("AI Context", isArjun ? "Persona + Uploads" : "Uploads Only"),
+            _infoRow("Data", isArjun ? "Hardcoded + Uploaded" : "Uploaded Only"),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isArjun ? const Color(0xFFFFF3E0) : const Color(0xFFE0F7FA),
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(height: 16),
-              ValueListenableBuilder<bool>(
-                valueListenable: DataMode.isDemo,
-                builder: (_, isDemo, __) => SwitchListTile(
-                  title: Text(
-                    isDemo ? "Demo Mode (Hardcoded)" : "Live Mode (Uploaded)",
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: Text(
-                    isDemo ? "Using Priya Sharma persona" : "Using real scanned records",
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF9BA8BB)),
-                  ),
-                  value: isDemo,
-                  activeColor: const Color(0xFFE07B39),
-                  onChanged: (val) {
-                    DataMode.toggle();
-                    setDialogState(() {});
-                  },
-                ),
+              child: Text(
+                isArjun 
+                    ? "📋 Demo mode: AI has access to Arjun Mishra's hardcoded medical history."
+                    : "🔒 Live mode: AI only knows what you upload. No pre-loaded data.",
+                style: const TextStyle(fontSize: 12, color: Color(0xFF5A6880)),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("Close"),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              "To switch identity, logout and login with a different phone number.",
+              style: TextStyle(fontSize: 11, color: Color(0xFF9BA8BB)),
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              auth.logout();
+              Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+            },
+            child: const Text("Switch User", style: TextStyle(color: Color(0xFFD32F2F))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF9BA8BB)))),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+        ],
       ),
     );
   }
@@ -345,28 +392,63 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _recordCard(BuildContext context, String title, String date, IconData icon) {
+  Widget _wideRecordCard(BuildContext context, String title, String date, IconData icon) {
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, '/records'),
       child: Container(
-        width: 118,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFD8DDE6)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFD8DDE6).withOpacity(0.5)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Icon(icon, size: 22, color: const Color(0xFF0D2240)),
-            const Spacer(),
-            TranslatedText(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-            Text(date, style: const TextStyle(fontSize: 10, color: Color(0xFF9BA8BB))),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F7F7),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(child: Icon(icon, color: const Color(0xFF00A3A3), size: 24)),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0D2240)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    date,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF9BA8BB), fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Color(0xFFD8DDE6)),
           ],
         ),
       ),
     );
+  }
+
+  IconData _getCategoryIcon(String category) {
+    category = category.toLowerCase();
+    if (category.contains('lab')) return Icons.science_rounded;
+    if (category.contains('prescription')) return Icons.medication_rounded;
+    if (category.contains('scan') || category.contains('x-ray')) return Icons.biotech_rounded;
+    if (category.contains('eye')) return Icons.visibility_rounded;
+    return Icons.assignment_rounded;
   }
 
   Widget _bottomNavItem(IconData icon, String label, bool isActive, {VoidCallback? onTap}) {

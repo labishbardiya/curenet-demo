@@ -6,6 +6,7 @@ const { runHybridOcr } = require('./ocr/pythonBridge');
 const { parsePrescriptionText } = require('./ocr/parserService');
 const { extractWithVisionLlm } = require('./ocr/visionLlmService');
 const { processDocument } = require('./documentProcessor');
+const { generateEmbedding } = require('./embeddingService');
 
 /**
  * ═══════════════════════════════════════════════════════════════════
@@ -71,12 +72,44 @@ const runJob = async (jobRecord) => {
             ? (ocrConfidence + finalAllConf.reduce((a, b) => a + b, 0) / finalAllConf.length) / 2
             : ocrConfidence;
 
-        // 6. Save to job record
+        // 6. Generate Clinical Atoms for AI Context
+        const clinicalAtoms = [];
+        if (ui_data.document_type === 'prescription') {
+            ui_data.medications.forEach(m => {
+                clinicalAtoms.push({
+                    type: 'medication',
+                    name: m.name,
+                    value: m.dosage,
+                    date: ui_data.summary.date,
+                    metadata: { frequency: m.frequency, duration: m.duration }
+                });
+            });
+        }
+        if (ui_data.document_type === 'lab_report') {
+            ui_data.lab_results.forEach(l => {
+                clinicalAtoms.push({
+                    type: 'observation',
+                    name: l.test_name,
+                    value: l.value,
+                    unit: l.unit,
+                    date: ui_data.summary.date,
+                    metadata: { reference_range: l.reference_range }
+                });
+            });
+        }
+
+        // Save to job record
         jobRecord.raw_text = raw_text;
         jobRecord.confidence_score = finalConfidence;
         jobRecord.status = 'completed';
         jobRecord.fhirBundle = fhir_bundle;
         jobRecord.uiData = ui_data;
+        jobRecord.clinical_atoms = clinicalAtoms;
+
+        // 7. SEMANTIC OPTIMIZATION: Generate Vector Embedding
+        console.log('[Worker] Generating semantic vector embedding for Atlas Vector Search...');
+        const semanticText = `${ui_data.document_type} from ${ui_data.summary.doctor || 'Unknown'}. ${raw_text.substring(0, 500)}`;
+        jobRecord.vector_embedding = await generateEmbedding(semanticText);
 
         // ABDM context for quick UI access
         jobRecord.abdmContext = {
