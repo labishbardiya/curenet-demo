@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CureNet | Doctor Secure Portal (ABDM M3)</title>
+    <meta name="description" content="ABDM M3 Compliant HIU Interface for secure patient data access with E2EE">
+    <link rel="stylesheet" href="style.css?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- QR Scanning Library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- Crypto Libraries (Production Grade) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- TweetNaCl for X25519 (ECDH) -->
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/dist/nacl.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl-util@0.15.1/dist/nacl-util.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">C</div>
+                <span>CureNet</span>
+            </div>
+            <ul class="nav-links">
+                <li class="active"><i class="fa-solid fa-chart-line"></i> Dashboard</li>
+                <li><i class="fa-solid fa-user-doctor"></i> My Patients</li>
+                <li><i class="fa-solid fa-clock-rotate-left"></i> Access Logs</li>
+                <li><i class="fa-solid fa-gear"></i> Settings</li>
+            </ul>
+            <div class="doctor-profile">
+                <div class="dr-avatar">SK</div>
+                <div class="dr-info">
+                    <p class="dr-name">Dr. Suresh Kumar</p>
+                    <p class="dr-id">ABHA: suresh.k@abdm</p>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="welcome">
+                    <h1>Secure Patient Data Access</h1>
+                    <p>ABDM M3 Compliant HIU Interface</p>
+                </div>
+                <div class="security-badge">
+                    <span class="pulse"></span>
+                    <i class="fa-solid fa-shield-halved"></i>
+                    E2EE Session Active
+                </div>
+            </header>
+
+            <div class="dashboard-grid">
+                <!-- QR Scanner Section -->
+                <section class="card scanner-section">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-qrcode" style="color:var(--primary);margin-right:8px"></i>Scan Patient QR</h2>
+                        <span class="badge">SECURE SCAN</span>
+                    </div>
+                    <div class="scanner-container">
+                        <div id="qr-reader"></div>
+                        <div class="scanner-placeholder" id="scanner-placeholder">
+                            <div class="scanner-anim"></div>
+                            <p>Camera ready for scanning</p>
+                        </div>
+                    </div>
+                    <div class="upload-options">
+                        <p>Or upload a QR image</p>
+                        <input type="file" id="qr-input" accept="image/*" class="file-input">
+                        <label for="qr-input" class="btn btn-outline btn-sm"><i class="fa-solid fa-upload"></i> Upload QR Image</label>
+                        
+                        <div class="manual-entry">
+                            <p>Manual Token Entry (Backup)</p>
+                            <input type="text" id="manual-token" placeholder="Paste curenet:// link here" class="text-input">
+                            <button id="btn-manual" class="btn btn-primary btn-sm"><i class="fa-solid fa-link"></i> Process Link</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Active Request Section -->
+                <section class="card request-section">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-bell" style="color:var(--warning);margin-right:8px"></i>Active Requests</h2>
+                        <span class="counter" id="active-count">0</span>
+                    </div>
+                    <div class="request-list" id="request-list">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-inbox" style="font-size:28px;color:#dce3ec;display:block;margin-bottom:12px"></i>
+                            <p>Scan a patient QR to initiate a secure consent request.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Decrypted Data Viewer (Modal) -->
+            <div id="data-viewer" class="modal">
+                <div class="modal-content">
+                    <!-- Print-only header -->
+                    <div class="print-header">
+                        <h1>CureNet — Patient Clinical Summary</h1>
+                        <p>Generated on <span id="print-date"></span> | ABDM M3 Compliant | E2EE Verified</p>
+                    </div>
+
+                    <div class="modal-header">
+                        <div class="patient-identity">
+                            <div class="p-avatar" id="viewer-avatar">P</div>
+                            <div>
+                                <h3 id="viewer-name">Patient Name</h3>
+                                <p id="viewer-abha">ABHA: ---</p>
+                            </div>
+                        </div>
+                        <button class="btn-close" id="close-viewer">&times;</button>
+                    </div>
+                    <div class="security-info-bar">
+                        <div>
+                            <i class="fa-solid fa-lock"></i>
+                            <span>Decrypted with X25519 + AES-256-GCM</span>
+                        </div>
+                        <span class="timer">Expires in <span id="expiry-timer">30:00</span></span>
+                    </div>
+                    <div class="medical-summary" id="medical-summary">
+                        <!-- Data injected here -->
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" id="btn-print"><i class="fa-solid fa-print"></i> Print Summary</button>
+                        <button class="btn btn-outline" id="revoke-btn"><i class="fa-solid fa-right-from-bracket"></i> Close Session</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Debug Log Overlay (Production Diagnostics) -->
+    <div id="debug-log" class="debug-overlay">
+        <div class="debug-header">
+            <span><i class="fa-solid fa-terminal" style="margin-right:6px"></i>System Logs</span>
+            <button onclick="this.parentElement.parentElement.style.display='none'">&times;</button>
+        </div>
+        <div id="debug-content"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl-util@0.15.1/nacl-util.min.js"></script>
+    <script src="crypto-utils.js?v=5"></script>
+    <script src="main.js?v=8"></script>
+</body>
+</html>

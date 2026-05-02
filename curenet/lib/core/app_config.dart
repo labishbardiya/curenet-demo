@@ -39,8 +39,9 @@ class AppConfig {
   /// Production OCR URL (replace with actual cloud endpoint once deployed)
   static const String _ocrProductionUrl = 'https://api.curenet.in/api/ocr';
 
-  /// Development OCR URL (use your machine's local IP for device testing)
-  static const String _ocrDevelopmentUrl = 'http://192.168.1.11:3000/api/ocr';
+  static const String _localIp = '172.16.66.43';
+  static const String _ocrDevelopmentUrl = 'http://$_localIp:3000/api/ocr';
+  static String get backendBaseUrl => 'http://$_localIp:3000';
 
   /// Toggle between production and development OCR endpoints
   static const bool isOcrProduction = false;

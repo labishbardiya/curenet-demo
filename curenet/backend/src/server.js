@@ -7,6 +7,7 @@ const connectDB = require('./config/db');
 require('./services/workerService'); 
 
 const ocrRoutes = require('./routes/ocrRoutes');
+const consentRoutes = require('./routes/consentRoutes');
 
 const app = express();
 
@@ -24,6 +25,7 @@ connectDB();
 
 // API Routing
 app.use('/api/ocr', ocrRoutes);
+app.use('/api/consent', consentRoutes);
 
 app.get('/', (req, res) => {
     res.send({ status: 'ok', msg: 'HIP ABDM OCR Service is Active.' });

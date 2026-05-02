@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// Hidden trigger: Triple-tap on the greeting text in HomeScreen.
 class DataMode {
+  
   DataMode._();
 
   static final ValueNotifier<bool> isDemo = ValueNotifier<bool>(true);
