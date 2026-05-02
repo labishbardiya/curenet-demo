@@ -5,7 +5,11 @@ import '../core/app_config.dart';
 import '../core/data_mode.dart';
 
 class OcrService {
-  static const String _storageKey = 'curenet_saved_records';
+  static const String _baseStorageKey = 'curenet_saved_records';
+  
+  /// Namespaced storage key — each user identity gets isolated records
+  static String get _storageKey => DataMode.storageKey(_baseStorageKey);
+  static String get _healthRecordsKey => DataMode.storageKey('health_records');
 
   /// Save a processed scan result to local storage.
   /// This stores the full uiData + fhirBundle so the rendered view
@@ -142,11 +146,11 @@ class OcrService {
     return trends;
   }
   
-  /// Clear all saved records (for debugging/testing)
+  /// Clear all saved records for the current user (for debugging/testing)
   static Future<void> clearAllRecords() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
-    await prefs.remove('health_records');
+    await prefs.remove(_healthRecordsKey);
   }
 
   // ─── Private Helpers ───────────────────────────────────────────────
@@ -181,6 +185,14 @@ class OcrService {
       case 'prescription': return 'Prescriptions';
       case 'lab_report': return 'Labs';
       default: return 'Reports';
+    }
+  }
+
+  static String _categoryToColor(String? cat) {
+    switch (cat) {
+      case 'Prescriptions': return '#E07B39';
+      case 'Labs': return '#00A3A3';
+      default: return '#6B4E9B';
     }
   }
 
@@ -242,7 +254,7 @@ class OcrService {
   /// Sync to the `health_records` key used by RecordsScreen in live mode
   static Future<void> _syncToHealthRecords(SharedPreferences prefs, Map<String, dynamic> record) async {
     try {
-      final String? existingData = prefs.getString('health_records');
+      final String? existingData = prefs.getString(_healthRecordsKey);
       List<Map<String, dynamic>> healthRecords = [];
       
       if (existingData != null) {
@@ -268,16 +280,19 @@ class OcrService {
         'summary': record['doctor'] != null ? 'Processed by ${record['doctor']}' : 'Auto-processed via OCR',
       });
       
-      await prefs.setString('health_records', jsonEncode(healthRecords));
+      await prefs.setString(_healthRecordsKey, jsonEncode(healthRecords));
     } catch (e) {
       print('Error syncing to health_records: $e');
     }
   }
 
-  /// Retrieve all saved records from the backend MongoDB (Production DB)
+  /// Retrieve all saved records from the backend MongoDB (scoped by userId)
   static Future<List<Map<String, dynamic>>> getBackendRecords() async {
     try {
-      final response = await http.get(Uri.parse('${AppConfig.ocrApiUrl.replaceAll('/ocr', '')}/records/all'))
+      final uri = Uri.parse('${AppConfig.backendUrl}/api/records/all').replace(
+        queryParameters: {'userId': DataMode.activeUserId},
+      );
+      final response = await http.get(uri)
           .timeout(const Duration(seconds: 5));
       
       if (response.statusCode == 200) {
@@ -291,12 +306,145 @@ class OcrService {
     }
   }
 
-  /// Get unified records based on DataMode
-  static Future<List<Map<String, dynamic>>> getUnifiedRecords() async {
-    if (DataMode.isDemo.value) {
-      return getLocalRecords();
-    } else {
-      return getBackendRecords();
+  /// Get merged records (Local + Cloud) with duplicate removal
+  static Future<List<Map<String, dynamic>>> getLiveMergedRecords() async {
+    // 1. Get Local Records
+    final local = await getLocalRecords();
+    
+    // 2. Get Backend Records
+    final backend = await getBackendRecords();
+    
+    // 3. Merge and unify format
+    final Map<String, Map<String, dynamic>> merged = {};
+    
+    // Add backend records first (usually most up-to-date)
+    for (var r in backend) {
+      final id = r['_id'] ?? r['localId'] ?? r.hashCode.toString();
+      final cat = r['uiData']?['document_type'] ?? r['category'] ?? 'Reports';
+      merged[id] = {
+        'title': r['title'] ?? r['uiData']?['summary']?['diagnosis'] ?? 'Medical Document',
+        'date': r['date'] ?? r['displayDate'] ?? '',
+        'doctor': r['doctor'] ?? r['uiData']?['summary']?['doctor'] ?? 'Unknown',
+        'category': _docTypeToCategory(cat),
+        'type': _docTypeToType(cat),
+        'color': _categoryToColor(_docTypeToCategory(cat)),
+        'localId': id,
+        'hasFullData': true,
+        'uiData': r['uiData'],
+        'fhirBundle': r['fhirBundle'],
+        'abdmContext': r['abdmContext'],
+        'labValues': r['labValues'],
+        'savedToLocker': true,
+        'summary': r['summary'] ?? '',
+      };
+    }
+    
+    // Add local records (overwrite or add new)
+    for (var r in local) {
+      final id = r['localId']?.toString() ?? r.hashCode.toString();
+      merged[id] = {
+        'title': r['title'] ?? 'Medical Document',
+        'date': r['displayDate'] ?? r['date'] ?? '',
+        'doctor': r['doctor'] ?? 'Unknown',
+        'category': r['category'] ?? 'Reports',
+        'type': _docTypeToType(r['category']),
+        'color': _categoryToColor(r['category']),
+        'localId': id,
+        'hasFullData': r['uiData'] != null,
+        'uiData': r['uiData'],
+        'fhirBundle': r['fhirBundle'],
+        'abdmContext': r['abdmContext'],
+        'labValues': r['labValues'],
+        'imagePath': r['imagePath'],
+        'savedToLocker': r['savedToLocker'] ?? false,
+        'summary': r['summary'] ?? '',
+      };
+    }
+    
+    final result = merged.values.toList();
+    // Sort by date descending (simple string sort for demo/ISO dates)
+    result.sort((a, b) => b['date'].toString().compareTo(a['date'].toString()));
+    return result;
+  }
+
+  static String _docTypeToType(String? cat) {
+    if (cat == null) return 'medical_services';
+    final c = cat.toLowerCase();
+    if (c.contains('presc') || c.contains('med')) return 'medication';
+    if (c.contains('lab') || c.contains('sci')) return 'science';
+    return 'medical_services';
+  }
+
+  /// Retrieve all clinical atoms for AI RAG reasoning
+  static Future<List<Map<String, dynamic>>> getClinicalAtoms() async {
+    try {
+      if (DataMode.activeUserId == DataMode.arjunId) {
+        // In demo mode, simulate atoms from local records
+        final records = await getLocalRecords();
+        List<Map<String, dynamic>> atoms = [];
+        for (var r in records) {
+            final uiData = r['uiData'] as Map<String, dynamic>? ?? {};
+            final date = r['date'] ?? '';
+            if (uiData['medications'] != null) {
+                for (var m in (uiData['medications'] as List)) {
+                    atoms.add({
+                        'type': 'medication',
+                        'name': m['name'],
+                        'value': m['dosage'],
+                        'date': date,
+                    });
+                }
+            }
+            if (uiData['lab_results'] != null) {
+                for (var l in (uiData['lab_results'] as List)) {
+                    atoms.add({
+                        'type': 'observation',
+                        'name': l['test_name'],
+                        'value': l['value'],
+                        'unit': l['unit'],
+                        'date': date,
+                    });
+                }
+            }
+        }
+        return atoms;
+      } else {
+        // Fetch from production backend (scoped by userId)
+        final uri = Uri.parse('${AppConfig.ocrApiUrl.replaceAll('/ocr', '')}/records/atoms').replace(
+          queryParameters: {'userId': DataMode.activeUserId},
+        );
+        final response = await http.get(uri)
+            .timeout(const Duration(seconds: 5));
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          return List<Map<String, dynamic>>.from(data['data']);
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching clinical atoms: $e');
+      return [];
+    }
+  }
+
+  /// Perform semantic search on the backend (Vector Search)
+  static Future<List<Map<String, dynamic>>> searchSemantic(String query) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConfig.ocrApiUrl.replaceAll('/ocr', '')}/records/search/semantic'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'query': query}),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['data']);
+      }
+      return [];
+    } catch (e) {
+      print('Semantic search failed: $e');
+      return [];
     }
   }
 }

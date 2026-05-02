@@ -7,7 +7,7 @@ import '../core/voice_helper.dart';
 import '../core/translated_text.dart';
 import '../core/persona.dart';
 import '../core/auth_provider.dart';
-import '../core/persona.dart';
+import '../core/data_mode.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,7 +17,20 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  Map<String, String> userData = Map<String, String>.from(Persona.profileMap);
+  /// Arjun gets Persona defaults. All other users start with a clean profile.
+  Map<String, String> userData = DataMode.activeUserId == DataMode.arjunId
+      ? Map<String, String>.from(Persona.profileMap)
+      : {
+          'name': '',
+          'abha': '',
+          'dob': '',
+          'mobile': '',
+          'bloodGroup': '',
+          'allergies': '',
+          'emergencyContact': '',
+          'conditions': '',
+          'physician': '',
+        };
 
   bool _isLoading = true;
 
@@ -29,7 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    final String? savedData = prefs.getString('user_profile_data');
+    final String? savedData = prefs.getString(DataMode.storageKey('user_profile_data'));
     if (savedData != null) {
       setState(() {
         userData = Map<String, String>.from(jsonDecode(savedData));
@@ -48,17 +61,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     }
+    // Force default name for demo consistency — only for Arjun
+    if (DataMode.activeUserId == DataMode.arjunId && (userData['name'] == 'New User' || userData['name']?.trim().isEmpty == true)) {
+      userData['name'] = Persona.name;
+    }
     
     setState(() => _isLoading = false);
   }
 
   Future<void> _saveUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_profile_data', jsonEncode(userData));
+    await prefs.setString(DataMode.storageKey('user_profile_data'), jsonEncode(userData));
     
     // Also update common keys used by AI/Snapshot
     await prefs.setString('user_name', userData['name']!);
     await prefs.setString('abha_address', userData['abha']!);
+
+    // Update AuthProvider for instant UI reaction
+    if (mounted) {
+      Provider.of<AuthProvider>(context, listen: false).updateProfile(Map<String, dynamic>.from(userData));
+    }
   }
 
   void _showEditDialog() {
@@ -67,58 +89,114 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final bloodCtrl = TextEditingController(text: userData['bloodGroup']);
     final allergiesCtrl = TextEditingController(text: userData['allergies']);
     final emergencyCtrl = TextEditingController(text: userData['emergencyContact']);
+    final physicianCtrl = TextEditingController(text: userData['physician']);
     final conditionsCtrl = TextEditingController(text: userData['conditions']);
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const TranslatedText("Edit Health Profile"),
-        content: SingleChildScrollView(
-          child: Column(
-            children: [
-              _editField("Full Name", nameCtrl),
-              _editField("Mobile Number", mobileCtrl),
-              _editField("Blood Group", bloodCtrl),
-              _editField("Allergies", allergiesCtrl),
-              _editField("Emergency Contact", emergencyCtrl),
-              _editField("Medical Conditions", conditionsCtrl),
-            ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(28),
+            topRight: Radius.circular(28),
           ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const TranslatedText("Cancel")),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                userData['name'] = nameCtrl.text;
-                userData['mobile'] = mobileCtrl.text;
-                userData['bloodGroup'] = bloodCtrl.text;
-                userData['allergies'] = allergiesCtrl.text;
-                userData['emergencyContact'] = emergencyCtrl.text;
-                userData['conditions'] = conditionsCtrl.text;
-              });
-              _saveUserData();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: TranslatedText("Profile updated successfully!"), backgroundColor: Color(0xFF00A3A3)),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00A3A3)),
-            child: const TranslatedText("Save"),
-          ),
-        ],
+        child: Column(
+          children: [
+            // Handle bar
+            Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD8DDE6),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Edit Profile", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0D2240))),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Cancel", style: TextStyle(color: Color(0xFF9BA8BB))),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            userData['name'] = nameCtrl.text;
+                            userData['mobile'] = mobileCtrl.text;
+                            userData['bloodGroup'] = bloodCtrl.text;
+                            userData['allergies'] = allergiesCtrl.text;
+                            userData['emergencyContact'] = emergencyCtrl.text;
+                            userData['physician'] = physicianCtrl.text;
+                            userData['conditions'] = conditionsCtrl.text;
+                          });
+                          _saveUserData();
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Profile updated"), backgroundColor: Color(0xFF00A3A3)),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00A3A3),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        child: const Text("Save", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE8ECF0)),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    _editField("Full Name", nameCtrl, Icons.person_outline),
+                    _editField("Mobile Number", mobileCtrl, Icons.phone_outlined),
+                    _editField("Blood Group", bloodCtrl, Icons.bloodtype_outlined),
+                    _editField("Allergies", allergiesCtrl, Icons.warning_amber_rounded),
+                    _editField("Emergency Contact", emergencyCtrl, Icons.emergency_outlined),
+                    _editField("Primary Physician", physicianCtrl, Icons.local_hospital_outlined),
+                    _editField("Medical Conditions", conditionsCtrl, Icons.medical_information_outlined, maxLines: 2),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _editField(String label, TextEditingController ctrl) {
+  Widget _editField(String label, TextEditingController ctrl, IconData icon, {int maxLines = 1}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: TextField(
         controller: ctrl,
+        maxLines: maxLines,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0D2240)),
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
+          labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF9BA8BB)),
+          prefixIcon: Icon(icon, size: 20, color: const Color(0xFF00A3A3)),
+          filled: true,
+          fillColor: const Color(0xFFF5F7FA),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFF00A3A3), width: 1.5)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
     );
@@ -142,14 +220,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Text("←", style: TextStyle(fontSize: 26, color: Colors.white)),
+                  child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
                 ),
                 const SizedBox(width: 12),
                 const TranslatedText("My Profile", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white)),
                 const Spacer(),
                 IconButton(
                   onPressed: _showEditDialog,
-                  icon: const Icon(Icons.edit, color: Colors.white),
+                  icon: const Icon(Icons.edit_outlined, color: Colors.white),
                 ),
               ],
             ),
@@ -173,8 +251,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TranslatedText(userData['name'] ?? Persona.name, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFF0D2240))),
-                      Text("ABHA: ${userData['abha'] ?? Persona.abhaNumber}", style: const TextStyle(fontSize: 13, color: Color(0xFF00C4C4))),
+                      TranslatedText(userData['name']?.isNotEmpty == true ? userData['name']! : 'Set Your Name', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFF0D2240))),
+                      Text("ABHA: ${userData['abha']?.isNotEmpty == true ? userData['abha']! : '—'}", style: const TextStyle(fontSize: 13, color: Color(0xFF00C4C4))),
                     ],
                   ),
                 ),

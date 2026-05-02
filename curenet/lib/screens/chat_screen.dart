@@ -13,6 +13,8 @@ import 'package:curenet/core/navigation_helper.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/auth_provider.dart';
+import '../core/data_mode.dart';
+import '../core/persona.dart';
 import 'profile_screen.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -199,7 +201,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!_useMedicalContext) return "[MEDICAL_RECORDS]\nAccess Disabled by User\n[/MEDICAL_RECORDS]";
 
     final prefs = await SharedPreferences.getInstance();
-    final String? recordsJson = prefs.getString('health_records');
+    final String? recordsJson = prefs.getString(DataMode.storageKey('health_records'));
     final String? abhaAddress = prefs.getString('abha_address') ?? 'Not provided';
     final String? userName = prefs.getString('user_name') ?? 'Priya Sharma';
 
@@ -232,33 +234,59 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final languageCode = AppLanguage.selectedLanguage.value;
     final patientContext = await _getPatientContext();
-    final reply = await AiService.sendMessage(
-      text, 
-      language: languageCode, 
-      patientContext: patientContext,
-    );
     
+    // Add an empty bot message that we'll fill as chunks arrive
     if (!mounted) return;
     setState(() {
-      _messages.add({"role": "bot", "text": reply});
-      _isTyping = false;
+      _messages.add({"role": "bot", "text": ""});
     });
-    _saveHistory();
-    _scrollToBottom();
+    
+    final botMsgIndex = _messages.length - 1;
+    String fullReply = "";
 
-    if (_autoSpeak) {
-      final plainText = reply.replaceAll(RegExp(r'\*|#'), '');
-      VoiceHelper.speak(plainText);
+    try {
+      final stream = AiService.sendMessageStream(
+        text, 
+        language: languageCode, 
+        patientContext: patientContext,
+      );
+      
+      await for (final chunk in stream) {
+        if (!mounted) break;
+        fullReply += chunk;
+        setState(() {
+          _messages[botMsgIndex]["text"] = fullReply;
+          // Hide thinking dots once first chunk arrives
+          if (_isTyping) _isTyping = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _messages[botMsgIndex]["text"] = "I'm having trouble connecting to Abhya AI. Please check your internet.";
+          _isTyping = false;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isTyping = false);
+        _saveHistory();
+        _scrollToBottom();
+
+        if (_autoSpeak && fullReply.isNotEmpty) {
+          final plainText = fullReply.replaceAll(RegExp(r'\*|#'), '');
+          VoiceHelper.speak(plainText);
+        }
+      }
     }
   }
 
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 50), () {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
+        _scrollController.jumpTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
         );
       }
     });
@@ -269,6 +297,11 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = msg["text"] as String;
     final botBubbleColor = _isDarkMode ? const Color(0xFF2F2F2F) : const Color(0xFFF3F4F6);
     final botTextColor = _isDarkMode ? Colors.white : const Color(0xFF1F2937);
+
+    // Don't render empty bot bubbles (streaming placeholder)
+    if (!isUser && text.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -316,19 +349,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (!isUser)
-                          animate 
-                            ? TypingText(
-                                text: text, 
-                                style: TextStyle(fontSize: 15, height: 1.5, color: botTextColor),
-                                onComplete: _scrollToBottom,
-                              )
-                            : MarkdownBody(
-                                data: text,
-                                styleSheet: MarkdownStyleSheet(
-                                  p: TextStyle(fontSize: 15, height: 1.5, color: botTextColor),
-                                  strong: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00A3A3)),
-                                ),
-                              )
+                          MarkdownBody(
+                            data: text,
+                            styleSheet: MarkdownStyleSheet(
+                              p: TextStyle(fontSize: 15, height: 1.5, color: botTextColor),
+                              strong: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00A3A3)),
+                            ),
+                          )
                         else
                           Text(
                             text,
@@ -352,7 +379,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ],
             ),
-            if (!isUser)
+            // Only show action icons when response is complete (not during streaming)
+            if (!isUser && text.length > 2 && !_isTyping)
               Padding(
                 padding: const EdgeInsets.only(top: 6, left: 36),
                 child: Row(
@@ -554,7 +582,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     TranslatedText("Abhya AI", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
                     Text(
-                      _isTemporary ? "Temporary Chat" : "GPT-4o Industry Level", 
+                      _isTemporary ? "Temporary Chat" : "Llama 3.3 · Medical RAG", 
                       style: TextStyle(fontSize: 10, color: _isTemporary ? Colors.orange : const Color(0xFF10A37F)),
                     ),
                   ],
@@ -613,8 +641,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 }
                 
                 final msg = _messages[index];
-                // Only animate if it's the LAST message and it's from the bot
-                final bool shouldAnimate = !_isTyping && index == _messages.length - 1 && msg["role"] == "bot";
+                // ONLY animate the FINAL completed message (not during streaming)
+                // During streaming, _isTyping is false but text is still being appended.
+                // We detect "streaming in progress" by checking if this is the last bot message 
+                // and fullReply is still growing (empty text = still loading).
+                final bool isLastBotMsg = index == _messages.length - 1 && msg["role"] == "bot";
+                final bool isStreaming = isLastBotMsg && _isTyping;
+                final bool shouldAnimate = false; // Disable TypingText — streaming IS the animation
                 
                 return _buildMessageBubble(msg, animate: shouldAnimate);
               },
@@ -733,7 +766,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final user = auth.userProfile;
     final String userName = (user != null && user['name'] != null && user['name'].toString().trim().isNotEmpty)
         ? user['name'].toString()
-        : Persona.name;
+        : (DataMode.activeUserId == DataMode.arjunId ? Persona.name : 'User');
 
     return Drawer(
       backgroundColor: const Color(0xFF202123),

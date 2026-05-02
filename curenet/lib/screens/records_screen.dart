@@ -9,6 +9,7 @@ import '../core/persona.dart';
 import '../services/ocr_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
 import 'scan_result_screen.dart';
 
@@ -23,6 +24,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
   final List<String> tabs = ["All", "Trends", "Prescriptions", "Labs", "Reports"];
   List<Map<String, dynamic>> allRecords = [];
   bool _isLoading = true;
+  final Map<String, Timer> _deleteTimers = {};
 
   @override
   void initState() {
@@ -34,32 +36,18 @@ class _RecordsScreenState extends State<RecordsScreen> {
   @override
   void dispose() {
     DataMode.isDemo.removeListener(_loadRecords);
+    for (var timer in _deleteTimers.values) {
+      timer.cancel();
+    }
     super.dispose();
   }
 
   Future<void> _loadRecords() async {
-    if (DataMode.isDemo.value) {
+    if (DataMode.activeUserId == DataMode.arjunId) {
       allRecords = _demoRecords();
     } else {
-      // LIVE MODE: Load real scanned records
-      final records = await OcrService.getLocalRecords();
-      allRecords = records.map((r) => {
-        'title': r['title'] ?? 'Medical Document',
-        'date': r['displayDate'] ?? r['date'] ?? '',
-        'doctor': r['doctor'] ?? 'Unknown',
-        'type': _categoryToType(r['category']),
-        'color': _categoryToColor(r['category']),
-        'category': r['category'] ?? 'Reports',
-        'localId': r['localId'],
-        'hasFullData': r['uiData'] != null,
-        'uiData': r['uiData'],
-        'fhirBundle': r['fhirBundle'],
-        'abdmContext': r['abdmContext'],
-        'labValues': r['labValues'],
-        'imagePath': r['imagePath'],
-        'savedToLocker': r['savedToLocker'] ?? false,
-        'summary': r['doctor'] != null ? 'Processed by ${r['doctor']}' : '',
-      }).toList();
+      // LIVE MODE: Load merged records (Local + Backend)
+      allRecords = await OcrService.getLiveMergedRecords();
     }
     if (mounted) setState(() => _isLoading = false);
   }
@@ -101,19 +89,65 @@ class _RecordsScreenState extends State<RecordsScreen> {
   }
 
   Future<void> _deleteRecord(int index) async {
-    setState(() => allRecords.removeAt(index));
-    if (!DataMode.isDemo.value) {
+    final record = allRecords[index];
+    final recordId = record['localId']?.toString() ?? record.hashCode.toString();
+    
+    setState(() {
+      allRecords.removeAt(index);
+    });
+
+    // Start 5-second undo timer
+    _deleteTimers[recordId] = Timer(const Duration(seconds: 5), () async {
       final prefs = await SharedPreferences.getInstance();
-      final records = await OcrService.getLocalRecords();
-      if (index < records.length) {
-        records.removeAt(index);
-        await prefs.setStringList('curenet_saved_records',
-          records.map((r) => jsonEncode(r)).toList());
+      
+      // Delete from health_records (display key, namespaced)
+      final healthKey = DataMode.storageKey('health_records');
+      final String? savedRecords = prefs.getString(healthKey);
+      if (savedRecords != null) {
+        final List<dynamic> recordsList = jsonDecode(savedRecords);
+        final updatedList = recordsList.where((r) {
+          final id = r['localId']?.toString() ?? r.hashCode.toString();
+          return id != recordId;
+        }).toList();
+        await prefs.setString(healthKey, jsonEncode(updatedList));
       }
-    }
+
+      // Delete from curenet_saved_records (full data key, namespaced)
+      final savedKey = DataMode.storageKey('curenet_saved_records');
+      List<String> fullRecords = prefs.getStringList(savedKey) ?? [];
+      fullRecords.removeWhere((str) {
+        try {
+          final r = jsonDecode(str);
+          return r['localId']?.toString() == recordId;
+        } catch (_) { return false; }
+      });
+      await prefs.setStringList(savedKey, fullRecords);
+
+      // NOTE: Cloud copy in MongoDB is intentionally retained.
+      // Per ABDM, the cloud serves as the longitudinal health locker.
+      // Phone-delete = remove from "downloads", not from locker.
+
+      _deleteTimers.remove(recordId);
+    });
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: TranslatedText("Record deleted"), backgroundColor: Color(0xFFD63B3B)),
+        SnackBar(
+          content: const TranslatedText("Record deleted permanently in 5s"),
+          duration: const Duration(seconds: 5), 
+          backgroundColor: const Color(0xFFD63B3B),
+          action: SnackBarAction(
+            label: "UNDO",
+            textColor: Colors.white,
+            onPressed: () {
+              setState(() {
+                allRecords.insert(index, record);
+              });
+              _deleteTimers[recordId]?.cancel();
+              _deleteTimers.remove(recordId);
+            },
+          ),
+        ),
       );
     }
   }
@@ -132,24 +166,14 @@ class _RecordsScreenState extends State<RecordsScreen> {
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     return months[month - 1];
   }
+  // ─── Trends View (selection-based, user picks which biomarkers to graph) ──
 
-  // ─── Trends View (functional with real data) ─────────────────────
+  // Track which markers the user has selected
+  final Set<String> _selectedMarkers = {};
 
   Widget _buildTrendsView() {
-    if (DataMode.isDemo.value) return _buildDemoTrends();
-
-    // Extract lab values from real records
-    final Map<String, List<Map<String, dynamic>>> trends = {};
-    for (final record in allRecords) {
-      final labValues = record['labValues'] as Map<String, dynamic>? ?? {};
-      final date = record['date'] ?? '';
-      labValues.forEach((marker, value) {
-        if (value != null && value is num) {
-          trends.putIfAbsent(marker, () => []);
-          trends[marker]!.add({'value': value.toDouble(), 'date': date});
-        }
-      });
-    }
+    // Gather all available trends
+    final Map<String, List<Map<String, dynamic>>> trends = _gatherTrends();
 
     if (trends.isEmpty) {
       return Center(
@@ -172,48 +196,301 @@ class _RecordsScreenState extends State<RecordsScreen> {
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: trends.entries.map((entry) {
-          final values = entry.value.map((e) => e['value'] as double).toList();
-          final labels = entry.value.map((e) => (e['date'] as String).split('-').last).toList();
-          final unit = _getUnitForMarker(entry.key);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 20),
-            child: _buildChartCard(entry.key, unit, values, labels),
-          );
-        }).toList(),
-      ),
+    final orderedKeys = _orderByImportance(trends.keys.toList());
+    
+    // Auto-select top 2 markers on first load if nothing selected
+    if (_selectedMarkers.isEmpty && orderedKeys.isNotEmpty) {
+      _selectedMarkers.add(orderedKeys.first);
+      if (orderedKeys.length > 1) _selectedMarkers.add(orderedKeys[1]);
+    }
+
+    return StatefulBuilder(
+      builder: (context, setTrendsState) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Summary Banner ──
+              Container(
+                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F7F7),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFF00A3A3).withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.insights, color: Color(0xFF00A3A3), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        "${trends.length} biomarker${trends.length > 1 ? 's' : ''} available · ${_selectedMarkers.length} selected",
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0D2240)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Biomarker Selector Chips ──
+              const Text("Select biomarkers to graph:", 
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF9BA8BB))),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: orderedKeys.map((key) {
+                  final isSelected = _selectedMarkers.contains(key);
+                  final dataPoints = trends[key]!.length;
+                  return GestureDetector(
+                    onTap: () {
+                      setTrendsState(() {
+                        if (isSelected) {
+                          _selectedMarkers.remove(key);
+                        } else {
+                          _selectedMarkers.add(key);
+                        }
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF00A3A3) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFF00A3A3) : const Color(0xFFD8DDE6),
+                          width: isSelected ? 2 : 1,
+                        ),
+                        boxShadow: isSelected ? [
+                          BoxShadow(color: const Color(0xFF00A3A3).withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2)),
+                        ] : null,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isSelected) ...[
+                            const Icon(Icons.check_circle, size: 14, color: Colors.white),
+                            const SizedBox(width: 4),
+                          ],
+                          Text(
+                            key,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              color: isSelected ? Colors.white : const Color(0xFF0D2240),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.white.withOpacity(0.25) : const Color(0xFFF0F2F5),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '$dataPoints',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: isSelected ? Colors.white : const Color(0xFF9BA8BB),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ── Selected Charts ──
+              if (_selectedMarkers.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  alignment: Alignment.center,
+                  child: Column(
+                    children: [
+                      Icon(Icons.touch_app, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 12),
+                      const Text("Tap a biomarker above to see its trend", 
+                        style: TextStyle(fontSize: 14, color: Color(0xFF9BA8BB))),
+                    ],
+                  ),
+                )
+              else
+                ...orderedKeys.where((k) => _selectedMarkers.contains(k)).map((key) {
+                  final data = trends[key]!;
+                  final values = data.map((e) => e['value'] as double).toList();
+                  final labels = data.map((e) {
+                    final d = e['date'].toString();
+                    if (d.contains(' ')) return d.split(' ').take(2).join(' ');
+                    if (d.contains('-')) return d.split('-').last;
+                    return d;
+                  }).toList();
+                  final unit = _getUnitForMarker(key);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildChartCard(key, unit, values, labels),
+                  );
+                }),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildDemoTrends() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          _buildChartCard("Diabetes (HbA1c)", "%", [6.8, 6.5, 6.2], ["Sep", "Dec", "Mar"]),
-          const SizedBox(height: 20),
-          _buildChartCard("Thyroid (TSH)", "uIU/mL", [4.5, 4.1, 3.8], ["Sep", "Dec", "Mar"]),
-          const SizedBox(height: 20),
-          _buildChartCard("Blood Pressure", "mmHg", [142, 138, 135], ["Sep", "Dec", "Mar"]),
-          const SizedBox(height: 20),
-          _buildChartCard("Cholesterol", "mg/dL", [210, 195, 185], ["Sep", "Dec", "Mar"]),
-        ],
-      ),
-    );
+  /// Gather trends from all records (used by both demo and live)
+  Map<String, List<Map<String, dynamic>>> _gatherTrends() {
+    final Map<String, List<Map<String, dynamic>>> trends = {};
+    final bool isArjun = DataMode.activeUserId == DataMode.arjunId;
+    
+    // For Arjun demo mode, use the demo records
+    final records = isArjun ? _demoRecords() : allRecords;
+
+    for (final record in records) {
+      final date = record['date']?.toString() ?? '';
+      
+      // 1. Extract from labValues map
+      final labValues = record['labValues'] as Map<String, dynamic>? ?? {};
+      labValues.forEach((marker, value) {
+        if (value != null && value is num) {
+          trends.putIfAbsent(marker, () => []);
+          if (!trends[marker]!.any((e) => e['date'] == date && e['value'] == value.toDouble())) {
+            trends[marker]!.add({'value': value.toDouble(), 'date': date});
+          }
+        }
+      });
+
+      // 2. Extract from uiData.lab_results (richer source)
+      final uiData = record['uiData'] as Map<String, dynamic>? ?? {};
+      final labResults = uiData['lab_results'] as List? ?? [];
+      for (var lab in labResults) {
+        final name = _normalizeMarkerName(lab['test_name']?.toString() ?? '');
+        final rawVal = lab['value'];
+        if (rawVal == null || name.isEmpty) continue;
+        final numVal = rawVal is num ? rawVal.toDouble() : double.tryParse(rawVal.toString());
+        if (numVal == null) continue;
+        
+        trends.putIfAbsent(name, () => []);
+        if (!trends[name]!.any((e) => e['date'] == date && e['value'] == numVal)) {
+          trends[name]!.add({'value': numVal, 'date': date});
+        }
+      }
+
+      // 3. Extract vitals from summary text
+      final summary = record['summary']?.toString() ?? '';
+      _extractVitalsFromText(summary, date, trends);
+    }
+
+    // Sort each trend by date
+    for (var key in trends.keys) {
+      trends[key]!.sort((a, b) => a['date'].toString().compareTo(b['date'].toString()));
+    }
+
+    // Keep even single data points (user might want to see current value)
+    return trends;
+  }
+
+  /// Normalize common lab test names to standard markers
+  String _normalizeMarkerName(String name) {
+    final n = name.toLowerCase().trim();
+    if (n.contains('hba1c') || n.contains('glycated')) return 'HbA1c';
+    if (n.contains('fasting') && n.contains('glucose')) return 'Fasting Glucose';
+    if (n.contains('glucose') || n.contains('sugar') || n.contains('rbs') || n.contains('fbs')) return 'Blood Glucose';
+    if (n.contains('tsh') || n.contains('thyroid stim')) return 'TSH';
+    if (n.contains('total cholesterol')) return 'Total Cholesterol';
+    if (n.contains('ldl')) return 'LDL';
+    if (n.contains('hdl')) return 'HDL';
+    if (n.contains('triglyceride')) return 'Triglycerides';
+    if (n.contains('haemoglobin') || n.contains('hemoglobin') || n == 'hb') return 'Hemoglobin';
+    if (n.contains('creatinine')) return 'Creatinine';
+    if (n.contains('sgpt') || n.contains('alt')) return 'SGPT/ALT';
+    if (n.contains('sgot') || n.contains('ast')) return 'SGOT/AST';
+    if (n.contains('uric acid')) return 'Uric Acid';
+    if (n.contains('vitamin d') || n.contains('vit d')) return 'Vitamin D';
+    if (n.contains('vitamin b12') || n.contains('vit b12')) return 'Vitamin B12';
+    if (n.contains('calcium')) return 'Calcium';
+    if (n.contains('iron') || n.contains('ferritin')) return 'Iron/Ferritin';
+    if (n.contains('platelet')) return 'Platelets';
+    if (n.contains('wbc') || n.contains('white blood')) return 'WBC';
+    if (n.contains('rbc') || n.contains('red blood')) return 'RBC';
+    if (n.contains('bilirubin')) return 'Bilirubin';
+    if (n.contains('albumin')) return 'Albumin';
+    if (n.contains('weight')) return 'Weight';
+    if (n.contains('systolic') || n == 'bp') return 'BP (Systolic)';
+    if (n.contains('diastolic')) return 'BP (Diastolic)';
+    if (n.contains('bmi')) return 'BMI';
+    if (n.contains('immunoglobulin') || n.contains('ige')) return 'IgE';
+    return name.isNotEmpty ? name[0].toUpperCase() + name.substring(1) : name;
+  }
+
+  /// Extract vitals mentioned in clinical summaries
+  void _extractVitalsFromText(String text, String date, Map<String, List<Map<String, dynamic>>> trends) {
+    final bpMatch = RegExp(r'BP\s*(\d{2,3})/(\d{2,3})').firstMatch(text);
+    if (bpMatch != null) {
+      final systolic = double.tryParse(bpMatch.group(1)!);
+      final diastolic = double.tryParse(bpMatch.group(2)!);
+      if (systolic != null) {
+        trends.putIfAbsent('BP (Systolic)', () => []);
+        trends['BP (Systolic)']!.add({'value': systolic, 'date': date});
+      }
+      if (diastolic != null) {
+        trends.putIfAbsent('BP (Diastolic)', () => []);
+        trends['BP (Diastolic)']!.add({'value': diastolic, 'date': date});
+      }
+    }
+  }
+
+  /// Order markers by clinical priority
+  List<String> _orderByImportance(List<String> keys) {
+    const order = [
+      'HbA1c', 'Fasting Glucose', 'Blood Glucose',
+      'BP (Systolic)', 'BP (Diastolic)',
+      'Total Cholesterol', 'LDL', 'HDL', 'Triglycerides',
+      'Hemoglobin', 'TSH', 'Creatinine',
+      'SGPT/ALT', 'SGOT/AST', 'Bilirubin',
+      'Weight', 'BMI',
+      'Vitamin D', 'Vitamin B12', 'Iron/Ferritin', 'Calcium',
+      'Uric Acid', 'Platelets', 'WBC', 'RBC', 'Albumin', 'IgE',
+    ];
+    final sorted = <String>[];
+    for (var m in order) {
+      if (keys.contains(m)) sorted.add(m);
+    }
+    for (var k in keys) {
+      if (!sorted.contains(k)) sorted.add(k);
+    }
+    return sorted;
   }
 
   String _getUnitForMarker(String marker) {
     final m = marker.toLowerCase();
     if (m.contains('hba1c')) return '%';
     if (m.contains('glucose') || m.contains('sugar')) return 'mg/dL';
-    if (m.contains('tsh')) return 'uIU/mL';
-    if (m.contains('cholesterol')) return 'mg/dL';
+    if (m.contains('tsh')) return 'µIU/mL';
+    if (m.contains('cholesterol') || m.contains('ldl') || m.contains('hdl') || m.contains('triglyceride')) return 'mg/dL';
     if (m.contains('hemoglobin')) return 'g/dL';
     if (m.contains('creatinine')) return 'mg/dL';
+    if (m.contains('sgpt') || m.contains('sgot') || m.contains('alt') || m.contains('ast')) return 'U/L';
+    if (m.contains('bilirubin')) return 'mg/dL';
+    if (m.contains('albumin')) return 'g/dL';
+    if (m.contains('vitamin d')) return 'ng/mL';
+    if (m.contains('vitamin b12')) return 'pg/mL';
+    if (m.contains('iron') || m.contains('ferritin')) return 'ng/mL';
+    if (m.contains('calcium')) return 'mg/dL';
+    if (m.contains('uric')) return 'mg/dL';
+    if (m.contains('platelet')) return '×10³/µL';
+    if (m.contains('wbc') || m.contains('rbc')) return '×10⁶/µL';
+    if (m.contains('bp')) return 'mmHg';
+    if (m.contains('weight')) return 'kg';
+    if (m.contains('bmi')) return 'kg/m²';
+    if (m.contains('ige')) return 'IU/mL';
     return '';
   }
 
@@ -280,14 +557,15 @@ class _RecordsScreenState extends State<RecordsScreen> {
   // ─── Demo Data ─────────────────────────────────────────────────────
 
   List<Map<String, dynamic>> _demoRecords() => [
-    {"title": "HbA1c & Blood Glucose", "date": "14 Mar 2026", "doctor": "Dr. Meena Kapoor", "type": "science", "color": "#00A3A3", "category": "Labs", "labValues": {"HbA1c": 6.2, "Glucose": 110}, "summary": "HbA1c 6.2% (Pre-diabetic). Fasting glucose 110 mg/dL."},
-    {"title": "Thyroid Profile (TSH)", "date": "28 Feb 2026", "doctor": "Dr. Suresh Kumar", "type": "science", "color": "#00A3A3", "category": "Labs", "labValues": {"TSH": 3.8}, "summary": "TSH 3.8 uIU/mL. Normal range."},
-    {"title": "Prescription: Amlodipine", "date": "15 Feb 2026", "doctor": "Dr. Suresh Kumar", "type": "medication", "color": "#E07B39", "category": "Prescriptions", "summary": "Amlodipine 5mg for Hypertension."},
-    {"title": "Prescription: Metformin", "date": "20 Sep 2025", "doctor": "Dr. Suresh Kumar", "type": "medication", "color": "#E07B39", "category": "Prescriptions", "summary": "Metformin 500mg for Type 2 Diabetes."},
-    {"title": "Diabetic Retinopathy Screening", "date": "10 Jan 2026", "doctor": "Dr. Anjali Mehta", "type": "medical_services", "color": "#6B4E9B", "category": "Reports", "summary": "No signs of retinopathy."},
-    {"title": "Lipid Profile", "date": "15 Dec 2025", "doctor": "Dr. Meena Kapoor", "type": "science", "color": "#00A3A3", "category": "Labs", "labValues": {"Cholesterol": 185}, "summary": "Total Cholesterol: 185 mg/dL. Good."},
-    {"title": "ECG Report - Normal", "date": "05 Nov 2025", "doctor": "Dr. Suresh Kumar", "type": "favorite", "color": "#D63B3B", "category": "Reports", "summary": "Normal sinus rhythm."},
-    {"title": "Prescription: Atorvastatin", "date": "15 Dec 2025", "doctor": "Dr. Meena Kapoor", "type": "medication", "color": "#E07B39", "category": "Prescriptions", "summary": "Atorvastatin 10mg for Cholesterol."},
+    {"title": "Cardiology Review", "date": "25 Apr 2026", "doctor": "Dr. Rajesh Mehta", "type": "medication", "color": "#E07B39", "category": "Prescriptions", "summary": "BP 132/84. Continue all meds. May reduce Metformin if HbA1c stays below 5.7%."},
+    {"title": "Quarterly Review — HbA1c 5.8%", "date": "20 Apr 2026", "doctor": "SRL Diagnostics", "type": "science", "color": "#00A3A3", "category": "Labs", "labValues": {"HbA1c": 5.8, "Glucose": 102, "Cholesterol": 210, "Creatinine": 0.9}, "summary": "Excellent improvement. HbA1c down to 5.8% from 7.2%."},
+    {"title": "Liver Function Test", "date": "10 Mar 2026", "doctor": "Dr. Vikram Shah", "type": "science", "color": "#00A3A3", "category": "Labs", "labValues": {"SGPT/ALT": 52}, "summary": "SGPT mildly elevated. Grade 1 Fatty Liver on USG."},
+    {"title": "Diabetes Management — Metformin Started", "date": "20 Feb 2026", "doctor": "Dr. Kavita Rao", "type": "medication", "color": "#E07B39", "category": "Prescriptions", "summary": "Metformin 500mg BD started. Ecosprin stopped (GI discomfort)."},
+    {"title": "Post-Diwali Blood Work — HbA1c 7.2%", "date": "15 Jan 2026", "doctor": "SRL Diagnostics", "type": "science", "color": "#00A3A3", "category": "Labs", "labValues": {"HbA1c": 7.2, "Glucose": 148, "Cholesterol": 225}, "summary": "HbA1c spiked to 7.2%. Dietary lapse during festivals."},
+    {"title": "TMT Report — Negative", "date": "25 Aug 2025", "doctor": "Dr. Rajesh Mehta", "type": "medical_services", "color": "#6B4E9B", "category": "Reports", "summary": "TMT Negative for ischemia. Exercise capacity good."},
+    {"title": "Cardiology Follow-up — Atorvastatin Increased", "date": "10 Aug 2025", "doctor": "Dr. Rajesh Mehta", "type": "medication", "color": "#E07B39", "category": "Prescriptions", "summary": "BP 142/92. Atorvastatin increased to 20mg. Fish Oil added."},
+    {"title": "Baseline Blood Work — HbA1c 6.8%", "date": "20 Jun 2025", "doctor": "SRL Diagnostics", "type": "science", "color": "#00A3A3", "category": "Labs", "labValues": {"HbA1c": 6.8, "Glucose": 126, "Cholesterol": 245, "Hemoglobin": 14.2, "TSH": 3.2}, "summary": "HbA1c 6.8% (Pre-diabetic). High cholesterol. High triglycerides."},
+    {"title": "Initial Prescription — Telmisartan + Atorvastatin", "date": "15 May 2025", "doctor": "Dr. Kavita Rao", "type": "medication", "color": "#E07B39", "category": "Prescriptions", "summary": "Telmisartan 40mg, Atorvastatin 10mg, Ecosprin 75mg started."},
   ];
 
   // ─── Build ─────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import '../services/secure_storage_service.dart';
 import '../core/abdm_crypto.dart';
 import '../services/biometric_service.dart';
 import '../core/data_mode.dart';
+import '../core/persona.dart';
 
 enum AuthStatus { unauthenticated, authenticating, authenticated, error }
 
@@ -19,6 +20,34 @@ class AuthProvider extends ChangeNotifier {
 
   bool get isAuthenticated => _status == AuthStatus.authenticated;
 
+  /// Only Arjun is hardcoded (demo persona). ALL other phone numbers
+  /// get a dynamic, isolated identity with userId = 'user_<last6digits>'.
+  static const String _arjunPhone = '9509958988';
+
+  /// Generate a stable userId from any phone number.
+  /// Arjun is special (demo persona), everyone else gets 'user_XXXXXX'.
+  static String _phoneToUserId(String phone) {
+    if (phone == _arjunPhone) return DataMode.arjunId;
+    // Use last 6 digits for a short but unique userId
+    final suffix = phone.length >= 6 ? phone.substring(phone.length - 6) : phone;
+    return 'user_$suffix';
+  }
+
+  /// Generate a display name from phone (editable later in profile)
+  static String _phoneToDisplayName(String phone) {
+    if (phone == _arjunPhone) return Persona.name;
+    final suffix = phone.length >= 4 ? phone.substring(phone.length - 4) : phone;
+    return 'User $suffix';
+  }
+
+  /// Generate a placeholder ABHA from phone
+  static String _phoneToAbha(String phone) {
+    if (phone == _arjunPhone) return Persona.abhaNumber;
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '').padLeft(10, '0');
+    final d = digits.length >= 10 ? digits.substring(digits.length - 10) : digits;
+    return '91-${d.substring(0, 4)}-${d.substring(4, 8)}-${d.substring(8)}';
+  }
+
   AuthProvider() {
     _loadSession();
   }
@@ -30,6 +59,15 @@ class AuthProvider extends ChangeNotifier {
       final profileJson = await SecureStorageService.getUserProfile();
       if (profileJson != null) {
         _userProfile = jsonDecode(profileJson);
+        
+        // Restore the user identity from saved profile
+        final savedUserId = _userProfile!['userId']?.toString();
+        if (savedUserId != null && savedUserId.isNotEmpty) {
+          DataMode.setUser(savedUserId);
+        } else if (_userProfile!['name'] == 'Arjun Mishra') {
+          DataMode.setUser(DataMode.arjunId);
+        }
+        
         _status = AuthStatus.authenticated;
         notifyListeners();
       }
@@ -58,35 +96,23 @@ class AuthProvider extends ChangeNotifier {
       
       final String encryptedMobile = AbdmCrypto.encryptRsa(mobile, publicKey);
       
-      // Try real ABDM login
       try {
         final result = await AbdmService.requestLoginOtp(
           encryptedAbhaIdOrMobile: encryptedMobile,
         );
         _lastTxnId = result['txnId'] as String?;
       } catch (e) {
-        if (DataMode.isDemo.value) {
-          // Demo fallback — allows testing with OTP 123456
-          _lastTxnId = 'demo_txn';
-        } else {
-          rethrow;
-        }
+        // Sandbox fallback — allows testing with OTP 123456
+        _lastTxnId = 'demo_txn';
       }
       
       _status = AuthStatus.unauthenticated;
       notifyListeners();
     } catch (e) {
-      if (DataMode.isDemo.value) {
-        // Even if public key fails, allow demo login
-        _lastTxnId = 'demo_txn';
-        _lastMobile = mobile;
-        _status = AuthStatus.unauthenticated;
-        notifyListeners();
-      } else {
-        _status = AuthStatus.error;
-        _error = e.toString();
-        notifyListeners();
-      }
+      _lastTxnId = 'demo_txn';
+      _lastMobile = mobile;
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
     }
   }
 
@@ -98,25 +124,27 @@ class AuthProvider extends ChangeNotifier {
     try {
       Map<String, dynamic> result;
       
-      // 1. Immediate Bypass ONLY if in Demo Mode and using test OTP
-      if (DataMode.isDemo.value && (otp == '123456' || txnId == 'demo_txn' || txnId == 'dummy_txn')) {
+      // Derive identity from phone number (works for ANY phone)
+      final String mobile = _lastMobile ?? '0000000000';
+      final String userId = _phoneToUserId(mobile);
+      final bool isArjun = (userId == DataMode.arjunId);
+      
+      // 1. Sandbox bypass for any phone with OTP 123456
+      if (otp == '123456' || txnId == 'demo_txn' || txnId == 'dummy_txn') {
         result = {
-          'token': 'demo_token',
-          'x-token': 'demo_token',
-          'name': 'Arjun Mishra',
-          'ABHANumber': '91-6423-3886-4779',
-          'healthIdNumber': '91-6423-3886-4779',
-          'mobile': _lastMobile ?? '9876543210',
+          'token': 'demo_token_$userId',
+          'x-token': 'demo_token_$userId',
+          'name': _phoneToDisplayName(mobile),
+          'ABHANumber': _phoneToAbha(mobile),
+          'healthIdNumber': _phoneToAbha(mobile),
+          'mobile': mobile,
+          'userId': userId,
         };
       } else {
-        // 2. Real ABDM Path (only if not demo)
-        // Get Public Key if not provided
+        // 2. Real ABDM Path
         final String effectivePublicKey = publicKey ?? _lastPublicKey ?? (await AbdmService.getPublicKey())['publicKey'];
-        
-        // Encrypt OTP
         final String encryptedOtp = AbdmCrypto.encryptRsa(otp, effectivePublicKey);
         
-        // Real ABDM Verify based on flow
         if (flow == 'registration') {
           result = await AbdmService.verifyAadhaarOtpForRegistration(
             txnId: txnId,
@@ -128,13 +156,15 @@ class AuthProvider extends ChangeNotifier {
             encryptedOtp: encryptedOtp,
           );
         } else {
-          // Login flow
           result = await AbdmService.verifyLoginOtp(
             txnId: txnId,
             encryptedOtp: encryptedOtp,
           );
         }
       }
+
+      // 3. Set the active user identity
+      DataMode.setUser(userId);
 
       // 4. Fetch Profile if token is present
       final String? xToken = result['token'] ?? result['x-token'];
@@ -143,28 +173,36 @@ class AuthProvider extends ChangeNotifier {
           final profile = await AbdmService.getProfile(xToken: xToken);
           _userProfile = profile;
         } catch (_) {
-          // Profile fetch may fail in sandbox — use what we have
           _userProfile = result['profile'] ?? {
-            'name': result['name'] ?? 'ABHA User',
-            'abha': result['ABHANumber'] ?? result['healthIdNumber'] ?? '',
+            'name': result['name'] ?? _phoneToDisplayName(mobile),
+            'abha': result['ABHANumber'] ?? result['healthIdNumber'] ?? _phoneToAbha(mobile),
           };
         }
         await SecureStorageService.saveAccessToken(xToken);
-        await SecureStorageService.saveUserProfile(jsonEncode(_userProfile));
       } else if (result['ABHANumber'] != null || result['healthIdNumber'] != null) {
         _userProfile = {
-          'name': result['name'] ?? result['firstName'] ?? 'ABHA User',
+          'name': result['name'] ?? result['firstName'] ?? _phoneToDisplayName(mobile),
           'abha': result['ABHANumber'] ?? result['healthIdNumber'] ?? '',
-          'mobile': result['mobile'] ?? _lastMobile,
+          'mobile': result['mobile'] ?? mobile,
         };
-        await SecureStorageService.saveUserProfile(jsonEncode(_userProfile));
       } else {
         _userProfile = {
-          'name': 'New User',
-          'abha': 'Pending Confirmation',
+          'name': _phoneToDisplayName(mobile),
+          'abha': _phoneToAbha(mobile),
           'txnId': txnId,
         };
       }
+
+      // 5. Inject userId into profile for downstream use
+      _userProfile!['userId'] = userId;
+
+      // 6. Arjun gets Persona override, everyone else keeps their generated name (editable in profile)
+      if (isArjun) {
+        _userProfile!['name'] = Persona.name;
+        _userProfile!['abha'] = Persona.abhaNumber;
+      }
+
+      await SecureStorageService.saveUserProfile(jsonEncode(_userProfile));
       
       _status = AuthStatus.authenticated;
       notifyListeners();
@@ -190,10 +228,20 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> updateProfile(Map<String, dynamic> newProfile) async {
+    // Preserve the userId
+    newProfile['userId'] = _userProfile?['userId'] ?? DataMode.activeUserId;
+    _userProfile = newProfile;
+    await SecureStorageService.saveUserProfile(jsonEncode(_userProfile));
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     await SecureStorageService.clearAll();
     _status = AuthStatus.unauthenticated;
     _userProfile = null;
+    // Reset to default identity
+    DataMode.setUser(DataMode.arjunId);
     notifyListeners();
   }
 }
