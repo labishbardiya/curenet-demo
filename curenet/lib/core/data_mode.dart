@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///   - AI context (Persona injected or not)
 ///   - MongoDB record filtering (userId query param)
 class DataMode {
+  
   DataMode._();
 
   /// Kept for backward compatibility — true only when Arjun is active.

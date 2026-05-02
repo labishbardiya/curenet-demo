@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/consent_manager.dart';
+import '../services/secure_storage_service.dart';
 import '../core/translated_text.dart';
 import '../core/persona.dart';
 import '../core/data_mode.dart';
@@ -15,10 +18,72 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  Timer? _pollingTimer;
+
   @override
   void initState() {
     super.initState();
     _requestPermissions();
+    _startGlobalPolling();
+  }
+
+  void _startGlobalPolling() {
+    final cm = context.read<ConsentManager>();
+    
+    // 1. Regular poll to ensure state is fresh
+    final isArjun = DataMode.activeUserId == DataMode.arjunId;
+    final abha = isArjun ? Persona.abhaAddress : '';
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (abha.isNotEmpty) await cm.pollForRequests(abha);
+    });
+
+    // 2. Real-time stream listener for immediate notifications
+    cm.requestStream.listen((request) {
+      if (mounted) _showConsentPopUp(request);
+    });
+  }
+
+  void _showConsentPopUp(ConsentArtefact request) {
+    if (ModalRoute.of(context)?.settings.name == '/access-req') return;
+    
+    // Auto-navigate if the user is looking for it? No, show notification first.
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.security, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("LIVE ACCESS REQUEST", 
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF00A3A3))),
+                  Text("Doctor ${request.requester.name} is requesting access",
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF0D2240),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: "REVIEW",
+          textColor: const Color(0xFF00A3A3),
+          onPressed: () => Navigator.pushNamed(context, '/access-req'),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _requestPermissions() async {
@@ -29,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
+    final cm = context.watch<ConsentManager>(); // Watch for request changes
     final user = auth.userProfile;
     final String userName = (user != null && user['name'] != null && user['name'].toString().trim().isNotEmpty)
         ? user['name'].toString()
@@ -39,13 +105,58 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-
+      body: Stack(
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  
+                  // Request Pop-up (If pending)
+                  if (cm.pendingRequest != null)
+                    _requestPopUpCard(cm.pendingRequest!),
+                  
+                  // ── BIOMETRIC SETUP PROMPT ──
+              FutureBuilder<bool>(
+                future: SecureStorageService.isBiometricsEnabled(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done && snapshot.data == false) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F7F7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF00A3A3), width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.fingerprint, color: Color(0xFF00A3A3)),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: TranslatedText(
+                              "Enable biometric login for faster access?",
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0D2240)),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              await SecureStorageService.setBiometricsEnabled(true);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Biometric login enabled!")),
+                              );
+                            },
+                            child: const TranslatedText("Enable"),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
 
               // ── TOP HEADER ──
               Padding(
@@ -111,6 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
+                    const SizedBox(height: 8),
                     GestureDetector(
                       onLongPress: () => _showDevToggle(context),
                       child: TranslatedText(
@@ -207,6 +319,154 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
+              const SizedBox(height: 24),
+
+              // ── CONSENT ACCESS LOG ──
+              if (cm.artefacts.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.admin_panel_settings, size: 18, color: Color(0xFF0D2240)),
+                          SizedBox(width: 6),
+                          Text("Consent Access Log",
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0D2240)),
+                          ),
+                        ],
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/access-ok'),
+                        child: const Text("View all →",
+                          style: TextStyle(fontSize: 13, color: Color(0xFF00A3A3), fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...cm.artefacts.reversed.take(3).map((artefact) {
+                  final isActive = artefact.status == ConsentStatus.granted;
+                  final isRevoked = artefact.status == ConsentStatus.revoked;
+
+                  Color statusColor = const Color(0xFF00A3A3);
+                  String statusText = 'PENDING';
+                  IconData statusIcon = Icons.hourglass_top;
+
+                  if (isActive) {
+                    statusColor = const Color(0xFF22A36A);
+                    statusText = 'ACTIVE';
+                    statusIcon = Icons.check_circle;
+                  } else if (isRevoked) {
+                    statusColor = const Color(0xFFD63B3B);
+                    statusText = 'REVOKED';
+                    statusIcon = Icons.block;
+                  } else if (artefact.status == ConsentStatus.denied) {
+                    statusColor = const Color(0xFF9BA8BB);
+                    statusText = 'DENIED';
+                    statusIcon = Icons.cancel;
+                  }
+
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isActive
+                            ? const Color(0xFF22A36A).withOpacity(0.3)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.medical_services, size: 18, color: statusColor),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(artefact.requester.name,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: isActive ? const Color(0xFF0D2240) : const Color(0xFF9BA8BB),
+                                ),
+                              ),
+                              Text(
+                                artefact.requestId,
+                                style: const TextStyle(fontSize: 9, color: Color(0xFF9BA8BB), fontFamily: 'monospace'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isActive)
+                          GestureDetector(
+                            onTap: () {
+                              cm.revokeConsent(artefact.consentId);
+                              final revokeAbha = (DataMode.activeUserId == DataMode.arjunId) ? Persona.abhaAddress : artefact.patientAbha;
+                              cm.sendResponse(revokeAbha, artefact.requestId, 'REVOKED');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Access revoked for ${artefact.requester.name}"),
+                                  backgroundColor: const Color(0xFFD63B3B),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFDE8E8),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.block, size: 12, color: Color(0xFFD63B3B)),
+                                  SizedBox(width: 4),
+                                  Text("Revoke",
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFD63B3B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(statusIcon, size: 10, color: statusColor),
+                                const SizedBox(width: 3),
+                                Text(statusText,
+                                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: statusColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 8),
+              ],
+
               // ── DYNAMIC RECENT RECORDS (max 3, hidden if empty) ──
               FutureBuilder<List<Map<String, dynamic>>>(
                 future: DataMode.activeUserId == DataMode.arjunId 
@@ -231,7 +491,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   return Column(
                     children: [
-                      // Header row
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Row(
@@ -246,7 +505,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      // Record cards
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Column(
@@ -271,7 +529,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: Container(
+    ],
+  ),
+  bottomNavigationBar: Container(
         height: 78,
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -370,6 +630,75 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── HELPER WIDGETS ──
+  Widget _requestPopUpCard(ConsentArtefact request) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D2240),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF00A3A3).withOpacity(0.3), blurRadius: 20, spreadRadius: 2),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(color: Color(0xFF00A3A3), shape: BoxShape.circle),
+                child: const Icon(Icons.security, size: 20, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("INCOMING ACCESS REQUEST", 
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF00A3A3), letterSpacing: 0.5)),
+                    Text(request.requester.name, 
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    context.read<ConsentManager>().denyConsent(request.consentId);
+                    final denyAbha = (DataMode.activeUserId == DataMode.arjunId) ? Persona.abhaAddress : request.patientAbha;
+                    context.read<ConsentManager>().sendResponse(denyAbha, request.requestId, 'DENIED');
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white24),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text("IGNORE", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pushNamed(context, '/access-req'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00A3A3),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text("REVIEW", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _quickAction(BuildContext context, IconData icon, String label, String route) {
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, route),

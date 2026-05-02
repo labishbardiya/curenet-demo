@@ -41,6 +41,9 @@ class AppConfig {
   static String get backendUrl =>
       const String.fromEnvironment('BACKEND_URL', defaultValue: 'http://172.16.56.80:3000');
 
+  /// Alias for consent_manager and other services that use backendBaseUrl
+  static String get backendBaseUrl => backendUrl;
+
   /// OCR API endpoint (derived from backendUrl)
   static String get ocrApiUrl => '$backendUrl/api/ocr';
 

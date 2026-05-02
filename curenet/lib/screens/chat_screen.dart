@@ -93,6 +93,36 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _deleteSession(String id) async {
+    final session = _sessions.firstWhere((s) => s['id'] == id);
+    final title = session['title'] ?? 'New Chat';
+
+    // Show professional confirmation dialog
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _isDarkMode ? const Color(0xFF2F2F2F) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("Delete chat?", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text("This will delete $title."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text("Cancel", style: TextStyle(color: _isDarkMode ? Colors.white70 : Colors.black54)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text("Delete", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     setState(() {
       _sessions.removeWhere((s) => s['id'] == id);
       if (_currentSessionId == id) {
@@ -103,6 +133,62 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
     });
+
+    // Save in background to prevent UI lag
+    _saveSessionsToDisk();
+  }
+
+  void _renameSession(String id) async {
+    final session = _sessions.firstWhere((s) => s['id'] == id);
+    final TextEditingController renameController = TextEditingController(text: session['title']);
+
+    String? newTitle = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _isDarkMode ? const Color(0xFF2F2F2F) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("Rename chat"),
+        content: TextField(
+          controller: renameController,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: "Enter new title"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, renameController.text),
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
+
+    if (newTitle != null && newTitle.trim().isNotEmpty) {
+      setState(() {
+        final index = _sessions.indexWhere((s) => s['id'] == id);
+        if (index != -1) {
+          _sessions[index]['title'] = newTitle.trim();
+        }
+      });
+      _saveSessionsToDisk();
+    }
+  }
+
+  void _togglePinSession(String id) {
+    setState(() {
+      final index = _sessions.indexWhere((s) => s['id'] == id);
+      if (index != -1) {
+        final bool isPinned = _sessions[index]['isPinned'] ?? false;
+        _sessions[index]['isPinned'] = !isPinned;
+      }
+    });
+    _saveSessionsToDisk();
+  }
+
+  Future<void> _saveSessionsToDisk() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('chat_sessions', jsonEncode(_sessions));
   }
@@ -829,8 +915,18 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: _sessions.length,
               itemBuilder: (context, index) {
-                final session = _sessions.reversed.toList()[index];
+                // Sort: Pinned first, then by chronological order (newest on top)
+                final sortedSessions = _sessions.toList()
+                  ..sort((a, b) {
+                    final bool aPinned = a['isPinned'] ?? false;
+                    final bool bPinned = b['isPinned'] ?? false;
+                    if (aPinned != bPinned) return bPinned ? 1 : -1;
+                    return (b['id'] as String).compareTo(a['id'] as String);
+                  });
+
+                final session = sortedSessions[index];
                 final isSelected = session['id'] == _currentSessionId;
+                final bool isPinned = session['isPinned'] ?? false;
                 
                 return MouseRegion(
                   cursor: SystemMouseCursors.click,
@@ -845,7 +941,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.chat_bubble_outline, color: Color(0xFFECECF1), size: 16),
+                          Icon(
+                            isPinned ? Icons.push_pin : Icons.chat_bubble_outline, 
+                            color: isPinned ? const Color(0xFF10A37F) : const Color(0xFFECECF1), 
+                            size: 16
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
@@ -858,17 +958,45 @@ class _ChatScreenState extends State<ChatScreen> {
                               icon: const Icon(Icons.more_horiz, color: Color(0xFFECECF1), size: 16),
                               padding: EdgeInsets.zero,
                               onSelected: (value) {
-                                if (value == 'delete') {
-                                  _deleteSession(session['id'] as String);
+                                switch (value) {
+                                  case 'pin':
+                                    _togglePinSession(session['id'] as String);
+                                    break;
+                                  case 'rename':
+                                    _renameSession(session['id'] as String);
+                                    break;
+                                  case 'delete':
+                                    _deleteSession(session['id'] as String);
+                                    break;
                                 }
                               },
                               itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'pin',
+                                  child: Row(
+                                    children: [
+                                      Icon(isPinned ? Icons.push_pin_outlined : Icons.push_pin, size: 18, color: Colors.white),
+                                      const SizedBox(width: 8),
+                                      Text(isPinned ? "Unpin" : "Pin", style: const TextStyle(color: Colors.white)),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'rename',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit_outlined, size: 18, color: Colors.white),
+                                      const SizedBox(width: 8),
+                                      Text("Rename", style: TextStyle(color: Colors.white)),
+                                    ],
+                                  ),
+                                ),
                                 const PopupMenuItem(
                                   value: 'delete',
                                   child: Row(
                                     children: [
                                       Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
-                                      SizedBox(width: 8),
+                                      const SizedBox(width: 8),
                                       Text("Delete", style: TextStyle(color: Colors.redAccent)),
                                     ],
                                   ),

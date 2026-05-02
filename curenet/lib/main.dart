@@ -5,6 +5,7 @@ import 'core/data_mode.dart';
 
 import 'package:provider/provider.dart';
 import 'core/auth_provider.dart';
+import 'services/consent_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +14,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => ConsentManager()),
       ],
       child: const CureNetApp(),
     ),
